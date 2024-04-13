@@ -1,0 +1,1 @@
+RUSTFLAGS="-C target-feature=AVX,SSE,SSE41" cargo test
