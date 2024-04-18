@@ -153,11 +153,20 @@ void MofoFilterAudioProcessorEditor::timerCallback ()
 
 //==============================================================================
 MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioProcessor& p)
-    : AudioProcessorEditor(&p), audioProcessor(p), drive("", "drive"),
-    minFrequency("Cutoff frequency for Auto Mode", "minCutoff"), amount("", "amount"), cutoffFrequency("Cutoff frequency for Classic Mode", "cutoff"),
-    resonance("", "resonance"), resonanceAmt("", "maxResonance"), volume("", "volume"), driveAmt("", "maxDrive"), speedAmt("Envelope follower for the cutoff amount", "maxSpeed"),
-    shape("Adjust the tension for the cutoff envelope.", "shape"), resShape("Adjust the tension for the resonance envelope.", "resShape"), 
-    driveShape("Adjust the tension for the drive envelope", "driveShape"), speedShape("Adjust the tension for the sepeed envelope", "speedShape"), 
+    : AudioProcessorEditor(&p), audioProcessor(p), 
+    drive("", "drive"),
+    minFrequency("Cutoff frequency for Auto Mode", "minCutoff"), 
+    amount("", "amount"), 
+    cutoffFrequency("Cutoff frequency for Classic Mode", "cutoff"),
+    resonance("", "resonance"), 
+    resonanceAmt("", "resonanceAmount"), 
+    volume("", "volume"), 
+    driveAmount("", "driveAmount"), 
+    speedAmount("Envelope follower for the cutoff envelope", "speedAmount"),
+    cutoffTension("Adjust the tension for the cutoff envelope.", "cutoffTension"), 
+    resonanceTension("Adjust the tension for the resonance envelope.", "resonanceTension"), 
+    driveTension("Adjust the tension for the drive envelope", "driveTension"), 
+    speedTension("Adjust the tension for the speed envelope", "speedTension"),
     mixer("Controls the dry/wet ratio", "mix")
 {
     juce::Rectangle<int> r = juce::Desktop::getInstance().getDisplays().getTotalBounds(true);
@@ -393,7 +402,7 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
     // ISAUTO
     isAutoOn.setButtonText("Auto");
     isAutoOn.setRadioGroupId(Auto);
-    isAutoOn.setTooltip("Sets the cutoff mode to auto, setting the cutoff frequency in harmonics of the current lowest note played. 1 = fundamental frequency.");
+    isAutoOn.setTooltip("Sets the cutoff mode to auto, setting the cutoff frequency in harmonics of the current lowest note played. 1 is the estimated fundamental frequency.");
     isAutoOn.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
     if (audioProcessor.treeState.getRawParameterValue("isAuto")->load() < 0.5f)
     {
@@ -454,7 +463,7 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
     amount.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
     amount.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 16);
     amount.setLookAndFeel(&knob);
-    amount.setTooltip("Sets the upper bound of the envelope follower, units are +(half octaves).");
+    amount.setTooltip("Sets the upper bound of the cutoff envelope follower, units are +(half octaves).");
     addAndMakeVisible(amount);
 
     amountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "amount", amount);
@@ -473,23 +482,23 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
     resonanceAmt.setTooltip("Sets the upper bound of the resonance sweeping.");
     addAndMakeVisible(resonanceAmt);
 
-    maxResonanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "maxResonance", resonanceAmt);
+    resonanceAmtAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "resonanceAmount", resonanceAmt);
 
-    driveAmt.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    driveAmt.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 16);
-    driveAmt.setLookAndFeel(&knob);
-    driveAmt.setTooltip("Sets the upper bound of the drive sweeping.");
-    addAndMakeVisible(driveAmt);
+    driveAmount.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    driveAmount.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 16);
+    driveAmount.setLookAndFeel(&knob);
+    driveAmount.setTooltip("Sets the upper bound of the drive sweeping.");
+    addAndMakeVisible(driveAmount);
 
-    maxDriveAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "maxDrive", driveAmt);
+    driveAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "driveAmount", driveAmount);
 
-    speedAmt.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    speedAmt.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    speedAmt.setLookAndFeel(&knob);
-    speedAmt.setTooltip("Sets the upper bound of the cutoffs follower's upper bound.");
-    addAndMakeVisible(speedAmt);
+    speedAmount.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    speedAmount.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    speedAmount.setLookAndFeel(&knob);
+    speedAmount.setTooltip("Sets the upper bound of the cutoff envelope follower's upper bound.");
+    addAndMakeVisible(speedAmount);
 
-    maxSpeedAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "maxSpeed", speedAmt);
+    speedAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "speedAmount", speedAmount);
 
     volume.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
     volume.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 16);
@@ -499,37 +508,37 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
 
     volumeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "volume", volume);
 
-    shape.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    shape.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    shape.setLookAndFeel(&center);
-    shape.setTooltip("Changes the shape that the cutoff follower responds with. 0 = linear");
-    addAndMakeVisible(shape);
+    cutoffTension.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    cutoffTension.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    cutoffTension.setLookAndFeel(&center);
+    cutoffTension.setTooltip("Changes the tension that the cutoff envelope follower responds with. 0 = linear");
+    addAndMakeVisible(cutoffTension);
 
-    shapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "shape", shape);
+    cutoffTensionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "cutoffTension", cutoffTension);
 
-    resShape.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    resShape.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    resShape.setLookAndFeel(&center);
-    resShape.setTooltip("Changes the shape that the resonance follower responds with. 0 = linear");
-    addAndMakeVisible(resShape);
+    resonanceTension.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    resonanceTension.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    resonanceTension.setLookAndFeel(&center);
+    resonanceTension.setTooltip("Changes the tension that the resonance envelope follower responds with. 0 = linear");
+    addAndMakeVisible(resonanceTension);
 
-    resShapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "resShape", resShape);
+    resonanceTensionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "resonanceTension", resonanceTension);
 
-    driveShape.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    driveShape.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    driveShape.setLookAndFeel(&center);
-    driveShape.setTooltip("Changes the shape that the drive follower responds with. 0 = linear");
-    addAndMakeVisible(driveShape);
+    driveTension.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    driveTension.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    driveTension.setLookAndFeel(&center);
+    driveTension.setTooltip("Changes the tension that the drive envelope follower responds with. 0 = linear");
+    addAndMakeVisible(driveTension);
 
-    driveShapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "driveShape", driveShape);
+    driveTensionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "driveTension", driveTension);
 
-    speedShape.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    speedShape.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    speedShape.setLookAndFeel(&center);
-    speedShape.setTooltip("Changes the shape that the speed follower responds with. 0 = linear");
-    addAndMakeVisible(speedShape);
+    speedTension.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    speedTension.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    speedTension.setLookAndFeel(&center);
+    speedTension.setTooltip("Changes the tension that the speed envelope follower responds with. 0 = linear");
+    addAndMakeVisible(speedTension);
 
-    speedShapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "speedShape", speedShape);
+    speedTensionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "speedTension", speedTension);
 
     addAndMakeVisible (mixer);
     mixerAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (audioProcessor.treeState, "mix", mixer);
@@ -671,18 +680,18 @@ void MofoFilterAudioProcessorEditor::resized()
     resonanceAmt.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 6.13f, size * 0.8f, size * 0.8f);
 
     //driveAmt 11.75, 5.25
-    driveAmt.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 8.32f, size * 0.8f, size * 0.8f);
+    driveAmount.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 8.32f, size * 0.8f, size * 0.8f);
 
     //speedAmt 11.75, 7.25
-    speedAmt.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 3.95f, size * 0.8f, size * 0.8f);
+    speedAmount.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 3.95f, size * 0.8f, size * 0.8f);
 
-    shape.setBounds(getWidth() * 0.05f * 17.05f, getWidth() * 0.05f * 2.0f, size * 0.8f, size * 0.8f);
+    cutoffTension.setBounds(getWidth() * 0.05f * 17.05f, getWidth() * 0.05f * 2.0f, size * 0.8f, size * 0.8f);
 
-    speedShape.setBounds(getWidth() * 0.05f * 17.05f, getWidth() * 0.05f * 3.95f, size * 0.8f, size * 0.8f);
+    speedTension.setBounds(getWidth() * 0.05f * 17.05f, getWidth() * 0.05f * 3.95f, size * 0.8f, size * 0.8f);
 
-    resShape.setBounds(speedShape.getX(), resonanceAmt.getY(), size * 0.8f, size * 0.8f);
+    resonanceTension.setBounds(speedTension.getX(), resonanceAmt.getY(), size * 0.8f, size * 0.8f);
 
-    driveShape.setBounds(speedShape.getX(), driveAmt.getY(), size * 0.8f, size * 0.8f);
+    driveTension.setBounds(speedTension.getX(), driveAmount.getY(), size * 0.8f, size * 0.8f);
 
     freqIsUpUp.setBounds(getWidth() * 0.05f * 14.45f, getWidth() * 0.05f * 2.08f, size * 0.84f, size * 0.32f);
     freqIsUpDown.setBounds(freqIsUpUp.getX(), freqIsUpUp.getY() + freqIsUpUp.getHeight(), freqIsUpUp.getWidth(), size * 0.32f);

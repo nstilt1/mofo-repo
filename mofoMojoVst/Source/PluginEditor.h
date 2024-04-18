@@ -106,16 +106,16 @@ private:
 
     MagicKnob resonance;
     MagicKnob resonanceAmt;
+    MagicKnob resonanceTension;
 
 
     MagicKnob drive;
     MagicKnob volume;
-    MagicKnob driveAmt;
-    MagicKnob speedAmt;
-    MagicKnob shape;
-    MagicKnob resShape;
-    MagicKnob driveShape;
-    MagicKnob speedShape;
+    MagicKnob driveAmount;
+    MagicKnob speedAmount;
+    MagicKnob cutoffTension;
+    MagicKnob driveTension;
+    MagicKnob speedTension;
 
     MagicKnob mixer;
 
@@ -125,15 +125,15 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> thresholdAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> harmonicThreshAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resonanceAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> maxResonanceAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resonanceAmtAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> driveAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> volumeAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> maxDriveAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> maxSpeedAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> shapeAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resShapeAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> driveShapeAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speedShapeAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> driveAmountAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speedAmountAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> cutoffTensionAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resonanceTensionAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> driveTensionAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speedTensionAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixerAttachment;
 
 
