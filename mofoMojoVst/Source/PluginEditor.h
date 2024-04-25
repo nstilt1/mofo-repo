@@ -27,12 +27,9 @@ public:
 
     bool shouldWindowBeVisible = false;
 
-    bool toolTipsEnabled;
+    bool toolTipsEnabled = true;
 
     bool isEnabled = true;
-    
-    double lastCutValue;
-    double lastMinCutValue;
 
     void timerCallback () override;
 
@@ -76,51 +73,50 @@ private:
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> is2PoleAttachment;
 
-    juce::TextButton freqIsUpUp;
-    juce::TextButton freqIsUpDown;
-    juce::Slider freqIsUp;
+    juce::TextButton freqDirectionUp;
+    juce::TextButton freqDirectionDown;
+    juce::Slider freqDirection;
 
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> freqIsUpAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> freqDirectionAttachment;
 
-    juce::TextButton resIsUpUp;
-    juce::TextButton resIsUpDown;
-    juce::Slider resIsUp;
+    juce::TextButton resDirectionUp;
+    juce::TextButton resDirectionDown;
+    juce::Slider resDirection;
 
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resIsUpAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resDirectionAttachment;
 
-    juce::TextButton driveIsUpUp;
-    juce::TextButton driveIsUpDown;
-    juce::Slider driveIsUp;
+    juce::TextButton driveDirectionUp;
+    juce::TextButton driveDirectionDown;
+    juce::Slider driveDirection;
 
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> driveIsUpAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> driveDirectionAttachment;
 
-    juce::TextButton speedIsUpUp;
-    juce::TextButton speedIsUpDown;
-    juce::Slider speedIsUp;
+    juce::TextButton speedDirectionUp;
+    juce::TextButton speedDirectionDown;
+    juce::Slider speedDirection;
 
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speedIsUpAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speedDirectionAttachment;
 
     MagicKnob minFrequency;
-    MagicKnob amount;
+    MagicKnob cutoffAmount;
     MagicKnob cutoffFrequency;
+    MagicKnob cutoffTension;
+    MagicKnob speedAmount;
+    MagicKnob speedTension;
 
     MagicKnob resonance;
     MagicKnob resonanceAmt;
     MagicKnob resonanceTension;
 
-
     MagicKnob drive;
-    MagicKnob volume;
     MagicKnob driveAmount;
-    MagicKnob speedAmount;
-    MagicKnob cutoffTension;
     MagicKnob driveTension;
-    MagicKnob speedTension;
+    MagicKnob volume;
 
     MagicKnob mixer;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> minFreqAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> amountAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> cutoffAmountAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> cutoffAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> thresholdAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> harmonicThreshAttachment;

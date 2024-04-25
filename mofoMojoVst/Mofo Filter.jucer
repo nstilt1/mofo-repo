@@ -1,19 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="qwaGvK" name="Mofo Mojo Filter" projectType="audioplug" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" displaySplashScreen="1" jucerFormatVersion="1"
-              pluginFormats="buildAU,buildAUv3,buildStandalone,buildVST3" bundleIdentifier="com.alteredbrainchemistry.MofoMojoFilter"
-              splashScreenColour="Dark" companyWebsite="https://alteredbrainchemistry.com"
-              companyName="Altered Brain Chemistry" pluginName="Mofo Mojo Filter"
-              pluginDesc="Envelope Filter Plugin" pluginManufacturer="Altered Brain Chemistry"
-              pluginCode="MOJO" pluginManufacturerCode="ABCh" pluginAUMainType="'aufx'"
-              pluginAUIsSandboxSafe="1" pluginVST3Category="Filter,Fx" cppLanguageStandard="17"
-              companyEmail="somedooby@gmail.com" pluginCharacteristicsValue="pluginEditorRequiresKeys"
-              version="1.0.2">
-  <MAINGROUP id="Kqft8I" name="Mofo Mojo Filter">
+<JUCERPROJECT id="qwaGvK" name="Mofo Mojo Filter V1" projectType="audioplug"
+              useAppConfig="0" addUsingNamespaceToJuceHeader="0" displaySplashScreen="1"
+              jucerFormatVersion="1" pluginFormats="buildAU,buildAUv3,buildStandalone,buildVST3"
+              bundleIdentifier="com.alteredbrainchemistry.MofoMojoFilter" splashScreenColour="Dark"
+              companyWebsite="https://alteredbrainchemistry.com" companyName="Altered Brain Chemistry"
+              pluginName="Mofo Mojo Filter V1" pluginDesc="Envelope Filter Plugin"
+              pluginManufacturer="Altered Brain Chemistry" pluginCode="Mojo"
+              pluginManufacturerCode="Abch" pluginAUMainType="'aufx'" pluginAUIsSandboxSafe="1"
+              pluginVST3Category="Filter,Fx" cppLanguageStandard="17" companyEmail="somedooby@alteredbrainchemistry.com"
+              pluginCharacteristicsValue="pluginEditorRequiresKeys" version="1.0.5">
+  <MAINGROUP id="Kqft8I" name="Mofo Mojo Filter V1">
+    <GROUP id="{B5CA9F11-01E9-B0A3-1827-CD83DD008D6F}" name="modules">
+      <GROUP id="{FA47A134-E9C4-AF73-7C63-AF8F72898C82}" name="components"/>
+      <GROUP id="{E7928BC5-50D1-36E5-4127-5F7B92252771}" name="dsp">
+        <FILE id="K37Nq8" name="EnvelopeProcessor.h" compile="0" resource="0"
+              file="Source/modules/dsp/EnvelopeProcessor.h"/>
+        <FILE id="mtrGl0" name="maths.h" compile="0" resource="0" file="Source/modules/dsp/maths.h"/>
+      </GROUP>
+    </GROUP>
     <GROUP id="{DE324CFB-14AF-0251-21C4-8350DE19639F}" name="Source">
-      <FILE id="Qwi6aR" name="EnvelopeProcessor.h" compile="0" resource="0"
-            file="Source/EnvelopeProcessor.h"/>
       <FILE id="iqrfZu" name="unlockedUI.png" compile="0" resource="1" file="unlockedUI.png"/>
       <FILE id="Vm8kF6" name="Knob.cpp" compile="1" resource="0" file="Source/Knob.cpp"/>
       <FILE id="DGg1lI" name="Knob.h" compile="0" resource="0" file="Source/Knob.h"/>
@@ -33,7 +39,7 @@
     <VS2022 targetFolder="Builds/VisualStudio2022">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Mojo Filter Debug Version"/>
-        <CONFIGURATION name="Release" targetName="Mofo Mojo Filter"/>
+        <CONFIGURATION name="Release" targetName="Mofo Mojo Filter V1"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_utils" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
@@ -55,7 +61,7 @@
     <XCODE_MAC targetFolder="Builds/MacOSX">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Filter"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="Mofo Filter"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="Mofo Mojo Filter v1"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_utils" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
@@ -76,20 +82,20 @@
     </XCODE_MAC>
   </EXPORTFORMATS>
   <MODULES>
-    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
-            useGlobalPath="0"/>
-    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+            useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
   </MODULES>
 </JUCERPROJECT>

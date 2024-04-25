@@ -1,6 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "EnvelopeProcessor.h"
+#include "modules/dsp/EnvelopeProcessor.h"
 
 //==============================================================================
 MofoFilterAudioProcessor::MofoFilterAudioProcessor() 
@@ -200,7 +200,7 @@ void MofoFilterAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     mix.prepare (spec);
     mix.reset ();
     mix.setMixingRule (juce::dsp::DryWetMixingRule::linear);
-    mix.setWetLatency (256);
+    mix.setWetLatency (2);
     mix.setWetMixProportion (chainSettings.mix);
 }
 
@@ -274,16 +274,11 @@ void MofoFilterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     float newRes;
     float newDrive;
 
-    float maxDrive = chainSettings.driveAmount;
-    float am = chainSettings.cutoffAmount;
-    float maxRes = chainSettings.resonanceAmount;
-    float maxSpeed = chainSettings.speedAmount;
-
     mix.setWetMixProportion (chainSettings.mix);
     mix.pushDrySamples (buffer);
     
     // process envelopes
-    if (maxDrive != 0.f || maxRes != 0.f || am != 1.f || maxSpeed != 0.f)
+    if (chainSettings.driveAmount != 0.f || chainSettings.resonanceAmount != 0.f || chainSettings.cutoffAmount != 1.f || chainSettings.speedAmount != 0.f)
     {
         float frequency;
         if (chainSettings.isAuto == 1)
@@ -370,7 +365,7 @@ void MofoFilterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
                 volumeRatio,
                 chainSettings.cutoffTension,
                 chainSettings.cutoff,
-                chainSettings.cutoffAmount * chainSettings.cutoff,
+                amount * chainSettings.cutoff,
                 18000.f,
                 chainSettings.freqIsUp
             );
@@ -392,19 +387,15 @@ void MofoFilterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         if (newFreq <= 0)
             newFreq = 20;
         ladderFilter.setCutoffFrequencyHz (newFreq);
-        
-        juce::dsp::AudioBlock<float> block (buffer);
-        auto processingContext = juce::dsp::ProcessContextReplacing<float> (block);
-        ladderFilter.process (processingContext);
-
-        gain.process (processingContext);
-
-        mix.mixWetSamples (processingContext.getOutputBlock ());
     }
-    else
-    {
-        MofoFilterAudioProcessor::processBlockBypassed (buffer, midiMessages);
-    }
+
+    juce::dsp::AudioBlock<float> block(buffer);
+    auto processingContext = juce::dsp::ProcessContextReplacing<float>(block);
+    ladderFilter.process(processingContext);
+
+    gain.process(processingContext);
+
+    mix.mixWetSamples(processingContext.getOutputBlock());
 }
 
 // Function called when parameter is changed
@@ -491,7 +482,7 @@ ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& treeState)
 
     settings.drive = treeState.getRawParameterValue("drive")->load();
 
-    settings.driveAmount = treeState.getRawParameterValue("maxDrive")->load();
+    settings.driveAmount = treeState.getRawParameterValue("driveAmount")->load();
     settings.cutoff = treeState.getRawParameterValue("cutoff")->load();
     settings.minCutoff = treeState.getRawParameterValue("minCutoff")->load();
 
@@ -522,10 +513,10 @@ ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& treeState)
     settings.is2Pole = treeState.getRawParameterValue("is2Pole")->load();
     settings.isHighPass = treeState.getRawParameterValue("isHighPass")->load();
     settings.isAuto = treeState.getRawParameterValue("isAuto")->load();
-    settings.freqIsUp = treeState.getRawParameterValue("freqIsUp")->load();
-    settings.resIsUp = treeState.getRawParameterValue("resIsUp")->load();
-    settings.driveIsUp = treeState.getRawParameterValue("driveIsUp")->load();
-    settings.speedIsUp = treeState.getRawParameterValue("speedIsUp")->load();
+    settings.freqIsUp = treeState.getRawParameterValue("freqDirection")->load();
+    settings.resIsUp = treeState.getRawParameterValue("resDirection")->load();
+    settings.driveIsUp = treeState.getRawParameterValue("driveDirection")->load();
+    settings.speedIsUp = treeState.getRawParameterValue("speedDirection")->load();
     settings.volume = treeState.getRawParameterValue("volume")->load();
     settings.mix = treeState.getRawParameterValue ("mix")->load ();
 
@@ -546,27 +537,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout MofoFilterAudioProcessor::cr
     juce::StringArray speedDirection = { "Down", "Up" };
     juce::StringArray paramDirection = { "Down", "Up" };
 
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "is2Pole", 1 }, "Slope", polarChoices, 1, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "isHighPass", 1 }, "Filter Type", filterChoices, 0, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "isAuto", 1 }, "Cutoff Frequency Mode", modeChoices, 0, ""));                                                                                       
-    layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{"drive", 1}, "Drive", juce::NormalisableRange<float>(1.f, 100.f, 0.1f, 1), 8));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "volume", 1}, "Volume", juce::NormalisableRange<float> (-30.f, 30.f, 0.1f, 1), -5));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "driveAmount", 1 }, "Drive Envelope Amount", juce::NormalisableRange<float> (0.f, 100.f, 0.1f, 1), 0));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "cutoff", 1 }, "Classic Mode Cutoff (Hz)", juce::NormalisableRange<float> (20.f, 16000.f, 1.f, 0.25f), 190.f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "minCutoff", 1 }, "Auto Mode Cutoff (Harmonics)", 0.01, 20, 3));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "cutoffAmount", 1 }, "Cutoff Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 7));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "resonance", 1 }, "Resonance", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 7.f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "maxResonance", 1 }, "Resonance Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 0));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "cutoffTension", 1 }, "Cutoff envelope tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "speedTension", 1 }, "Speed envelope tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "resonanceTension", 1 }, "Resonance Envelope Tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "driveTension", 1 }, "Drive Envelope Tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "speedAmount", 1 }, "Speed Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 0));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "freqIsUp", 1 }, "Cutoff frequency Envelope Direction", freqDirection, 0, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "resIsUp", 1 }, "Resonance Envelope Direction", resDirection, 1, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "speedIsUp", 1 }, "Speed Envelope Direction", speedDirection, 1, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "driveIsUp", 1 }, "Drive Envelope Direction", driveDirection, 1, ""));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "mix", 1 }, "Mix", juce::NormalisableRange<float> (0.f, 1.f, 0.01f), 1));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "is2Pole",          3 }, "Slope", polarChoices, 1, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "isHighPass",       3 }, "Filter Type", filterChoices, 0, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "isAuto",           3 }, "Cutoff Frequency Mode", modeChoices, 0, ""));                                                                                       
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{"drive",             3 }, "Drive", juce::NormalisableRange<float>(1.f, 100.f, 0.1f, 1), 8));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "volume",           3 }, "Volume", juce::NormalisableRange<float> (-30.f, 30.f, 0.1f, 1), -5));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "driveAmount",      3 }, "Drive Envelope Amount", juce::NormalisableRange<float> (0.f, 100.f, 0.1f, 1), 0));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "cutoff",           3 }, "Classic Mode Cutoff (Hz)", juce::NormalisableRange<float> (20.f, 16000.f, 1.f, 0.25f), 190.f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "minCutoff",        3 }, "Auto Mode Cutoff (Harmonics)", 0.01, 20, 3));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "cutoffAmount",     3 }, "Cutoff Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 7));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "resonance",        3 }, "Resonance", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 7.f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "resonanceAmount",  3 }, "Resonance Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 0));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "cutoffTension",    3 }, "Cutoff envelope tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "speedTension",     3 }, "Speed envelope tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "resonanceTension", 3 }, "Resonance Envelope Tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "driveTension",     3 }, "Drive Envelope Tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "speedAmount",      3 }, "Speed Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 0));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "freqDirection",    3 }, "Cutoff frequency Envelope Direction", freqDirection, 0, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "resDirection",     3 }, "Resonance Envelope Direction", resDirection, 1, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "speedDirection",   3 }, "Speed Envelope Direction", speedDirection, 1, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "driveDirection",   3 }, "Drive Envelope Direction", driveDirection, 1, ""));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "mix",              3 }, "Mix", juce::NormalisableRange<float> (0.f, 1.f, 0.01f), 1));
     ChainSettings settings;
     return layout;
 }

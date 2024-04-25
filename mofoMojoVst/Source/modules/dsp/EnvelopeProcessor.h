@@ -19,6 +19,7 @@
  * @param volumeRatio The ratio of current volume over max volume.
  * @param tension The tension knob's value for biasing the envelope.
  * @return float The bias
+ */
 float bias(float volumeRatio, float tension) {
     if (tension == 0.5f)
         return volumeRatio;
