@@ -12,6 +12,7 @@
 
 #include <JuceHeader.h>
 #include <math.h>
+#include "SIMDLadderFilter.h"
 
 struct ParamTree
 {
@@ -169,7 +170,8 @@ private:
 
     float currentVolume;
 
-    juce::dsp::LadderFilter<float> ladderFilter;
-
+    //juce::dsp::LadderFilter<float> ladderFilter;
+    SIMDLadderFilter<float> ladderFilter;
+    
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MofoFilterAudioProcessor)
 };
