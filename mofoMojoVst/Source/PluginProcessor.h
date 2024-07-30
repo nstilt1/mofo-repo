@@ -10,8 +10,32 @@
 
 #pragma once
 
-#include <JuceHeader.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
 #include <math.h>
+#include "../Source/modules/licensing/SoftwareLicensorStatus.h";
+
+class LicensingStatus : public SoftwareLicensorStatus
+{
+public:
+    juce::String getStoreId() override
+    {
+        return juce::String("ABCw9mRN-TeSq_IoJZi/W0JtBM0YbrlxAgNFnPm3I9U95lxksl5IIyHORLjqXT18a");
+    }
+
+    juce::String getCompanyName() override
+    {
+        auto s = juce::String("AlteredBrainChemistry");
+        return s;
+    }
+
+    std::vector<juce::String> getProductIdsAndPubkeys() override
+    {
+        std::vector<juce::String> productIdsAndPubkeys;
+        productIdsAndPubkeys.push_back("MOFOm8PT-fnstNGIJsV8YK3oJttfR3u0L;BB6c3F67C2jK7i+PVXIZR9H8hrcRyw6DfFq82I5Ugmf6jaoM1c+aig3FR6KQjz4h8q84nA5MNXe3d/zWtoMBSLHb10uaDrtlh3YMtfZrUUtashHMrmYNA65nl7P7+7vf0Q==");
+        return productIdsAndPubkeys;
+    }
+};
 
 struct ParamTree
 {
@@ -142,11 +166,11 @@ public:
 
     float max;
 
-
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     juce::AudioProcessorValueTreeState treeState{ *this, nullptr, "Parameters", createParameterLayout() };
 
+    LicensingStatus unlockStatus;
 
     //==============================================================================
     void getStateInformation (juce::MemoryBlock& destData) override;

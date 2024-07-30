@@ -1,18 +1,72 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "Knob.h"
-#include <JuceHeader.h>
 #include <public.sdk/source/vst/vstcomponentbase.h>
+
+juce::PopupMenu MofoFilterAudioProcessorEditor::modifyHostMenu(juce::PopupMenu menu)
+{
+    // make things look a bit nicer for our friends from Image-Line
+    if (juce::PluginHostType().isFruityLoops())
+    {
+        auto it = juce::PopupMenu::MenuItemIterator(menu);
+
+        while (it.next())
+        {
+            auto txt = it.getItem().text;
+
+            if (txt.startsWithChar('-'))
+            {
+                it.getItem().isSectionHeader = true;
+                it.getItem().text = txt.fromFirstOccurrenceOf("-", false, false);
+            }
+        }
+
+        return menu;
+    }
+
+    // we really don't need that parameter name repeated in Reaper...
+    if (juce::PluginHostType().isReaper())
+    {
+        auto newMenu = juce::PopupMenu();
+        auto it = juce::PopupMenu::MenuItemIterator(menu);
+
+        while (it.next())
+        {
+            auto txt = it.getItem().text;
+            bool include = true;
+
+            if (txt.startsWithChar('[') && txt.endsWithChar(']'))
+            {
+                include = it.next();
+            }
+
+            if (include)
+            {
+                newMenu.addItem(it.getItem());
+            }
+        }
+
+        return newMenu;
+    }
+
+    return menu;
+}
 
 void MofoFilterAudioProcessorEditor::showHostMenuForParam(const juce::MouseEvent& event, juce::String paramID)
 { 
-    auto c = getHostContext(); 
-    if (c != nullptr) 
+    if (auto *c = getHostContext()) 
     {
-        auto d = c->getContextMenuForParameterIndex(audioProcessor.treeState.getParameter(paramID));
-        auto o = juce::PopupMenu::Options();
+        auto d = c->getContextMenuForParameter(audioProcessor.treeState.getParameter(paramID));
 
-        d->getEquivalentPopupMenu().showMenuAsync(o);
+        if (auto* c = getHostContext())
+            if (auto menuInfo = c->getContextMenuForParameter(audioProcessor.treeState.getParameter(paramID)))
+            {
+                auto menu = menuInfo->getEquivalentPopupMenu();
+
+                menu = modifyHostMenu(menu);
+                
+                menu.showMenuAsync(juce::PopupMenu::Options{}.withTargetComponent(this).withMousePosition());
+            }   
     }
 }
 void MofoFilterAudioProcessorEditor::showInfo(juce::String pId)
@@ -26,12 +80,26 @@ bool MofoFilterAudioProcessorEditor::keyPressed(const juce::KeyPress& k)
     {
         toolTipsEnabled = !toolTipsEnabled;
     }
+    else if (k.isKeyCode(k.escapeKey))
+    {
+        unlockForm.dismiss();
+    }
     return true;
 }
 
  
 void MofoFilterAudioProcessorEditor::redrawButtons()
 {
+    if (audioProcessor.unlockStatus.isUnlocked())
+    {
+        unlockButton.setVisible(false);
+    }
+    else
+    {
+        unlockButton.setButtonText("Unlock");
+        unlockButton.setColour(juce::TextButton::ColourIds::buttonColourId, juce::Colours::green);
+        unlockButton.setVisible(true);
+    }
     if (audioProcessor.treeState.getRawParameterValue("isHighPass")->load() > 0.5f)
     {
         isHighPassOff.setToggleState(false, juce::NotificationType::dontSendNotification);
@@ -167,8 +235,10 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
     resonanceAmt("", "resonanceAmount"),
     resonanceTension("Adjust the tension for the resonance envelope.", "resonanceTension"),
     volume("", "volume"),     
-    mixer("Controls the dry/wet ratio", "mix")
+    mixer("Controls the dry/wet ratio", "mix"),
+    unlockForm(p.unlockStatus, "Please enter your license code", true)
 {
+    audioProcessor.unlockStatus.check_license_with_no_api_request();
     juce::Rectangle<int> r = juce::Desktop::getInstance().getDisplays().getTotalBounds(true);
     int x = r.getWidth();
     auto width = x / 2.0f;
@@ -183,6 +253,16 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
     tip.setTopRightPosition(juce::Component::getMouseXYRelative().getX(), juce::Component::getMouseXYRelative().getY());
     tip.setMillisecondsBeforeTipAppears(1420);
     addAndMakeVisible(tip);
+
+    unlockButton.setButtonText("Unlock");
+    
+    unlockButton.setColour(juce::TextButton::ColourIds::buttonColourId, juce::Colours::green);
+    unlockButton.addListener(this);
+    
+    addAndMakeVisible(unlockButton);
+
+
+    addChildComponent(unlockForm);
 
     isHighPassOff.setButtonText("LP");
     isHighPassOff.setRadioGroupId(isHP);
@@ -630,6 +710,12 @@ void MofoFilterAudioProcessorEditor::buttonClicked(juce::Button* button)
         speedDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
         speedDirection.setValue(0);
     }
+    else if (button = &unlockButton)
+    {
+        unlockForm.setVisible(true);
+        unlockForm.enterModalState();
+        unlockForm.toFront(true);
+    }
 }
 
 MofoFilterAudioProcessorEditor::~MofoFilterAudioProcessorEditor()
@@ -704,4 +790,9 @@ void MofoFilterAudioProcessorEditor::resized()
 
     speedDirectionUp.setBounds(getWidth() * 0.05f * 14.45f, getWidth() * 0.05f * 4.1f, size * 0.84f, size * 0.32f);
     speedDirectionDown.setBounds(speedDirectionUp.getX(), speedDirectionUp.getY() + speedDirectionUp.getHeight() - 2, speedDirectionUp.getWidth(), size * 0.32f);
+
+    if (!audioProcessor.unlockStatus.isUnlocked())
+        unlockButton.setBounds(volume.getX(), driveDirectionDown.getY(), volume.getWidth(), size * 0.33f);
+
+    unlockForm.setBounds(drive.getX() - 200, drive.getY() - 150, 400, 300);
 }

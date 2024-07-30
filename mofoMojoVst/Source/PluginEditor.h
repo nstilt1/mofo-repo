@@ -5,6 +5,19 @@
 #include "PluginProcessor.h"
 #include "Knob.h" 
 #include "MagicKnob.h"
+#include "../Source/modules/licensing/SoftwareLicensorUnlockForm.h";
+
+class UnlockForm : public SoftwareLicensorUnlockForm
+{
+public:
+    UnlockForm(LicensingStatus& status, juce::String userInstructions, bool hasCancelButton) : SoftwareLicensorUnlockForm(status, userInstructions, hasCancelButton)
+    {}
+    void dismiss() override
+    {
+        this->setVisible(false);
+        this->exitModalState();
+    }
+};
 
 //==============================================================================
 /**
@@ -37,6 +50,8 @@ public:
 
     void showHostMenuForParam(const juce::MouseEvent& e, juce::String paramID);
 
+    juce::PopupMenu modifyHostMenu(juce::PopupMenu menu);
+    UnlockForm unlockForm;
     void showInfo(juce::String pId);
 private:
     MofoFilterAudioProcessor& audioProcessor;
@@ -54,6 +69,8 @@ private:
 
     Knob knob;
     CenterKnob center;
+
+    juce::TextButton unlockButton;
 
     juce::TextButton isHighPassOff;
     juce::TextButton isHighPassOn;

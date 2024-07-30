@@ -1,6 +1,7 @@
 temp/
 mofoMojoVst/Builds/
 mofoMojoVst/JuceLibraryCode
+mofoMojoVst/build
 
 # Prerequisites
 *.d

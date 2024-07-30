@@ -5,7 +5,7 @@
 //==============================================================================
 MofoFilterAudioProcessor::MofoFilterAudioProcessor() 
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : forwardFFT(fftOrder), AudioProcessor (BusesProperties()
+     : forwardFFT(fftOrder), unlockStatus(), AudioProcessor(BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
                       #if ! JucePlugin_IsSynth
                        .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
@@ -15,6 +15,7 @@ MofoFilterAudioProcessor::MofoFilterAudioProcessor()
                        ) 
 #endif
 {
+    unlockStatus.check_license_with_potential_api_request();
     treeState.addParameterListener("isHighPass", this);
     treeState.addParameterListener("is2Pole", this);
     treeState.addParameterListener("resonance", this);
@@ -165,6 +166,7 @@ void MofoFilterAudioProcessor::changeProgramName (int index, const juce::String&
 //==============================================================================
 void MofoFilterAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    unlockStatus.check_license_with_no_api_request();
     max = 0.00000000001f;
     
     currentVolume = 0.0f;
@@ -391,11 +393,16 @@ void MofoFilterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     juce::dsp::AudioBlock<float> block(buffer);
     auto processingContext = juce::dsp::ProcessContextReplacing<float>(block);
-    ladderFilter.process(processingContext);
+    
+    if (unlockStatus.isUnlocked())
+    {
+        ladderFilter.process(processingContext);
 
-    gain.process(processingContext);
+        gain.process(processingContext);
+    }
 
     mix.mixWetSamples(processingContext.getOutputBlock());
+
 }
 
 // Function called when parameter is changed

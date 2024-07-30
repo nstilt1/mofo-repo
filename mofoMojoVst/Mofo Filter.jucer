@@ -12,7 +12,28 @@
               pluginCharacteristicsValue="pluginEditorRequiresKeys" version="1.0.5">
   <MAINGROUP id="Kqft8I" name="Mofo Mojo Filter V1">
     <GROUP id="{B5CA9F11-01E9-B0A3-1827-CD83DD008D6F}" name="modules">
-      <GROUP id="{FA47A134-E9C4-AF73-7C63-AF8F72898C82}" name="components"/>
+      <GROUP id="{BE9047F0-6BC7-4AB0-4417-98D4C11E4100}" name="licensing">
+        <GROUP id="{9CC1561D-6892-4062-A37F-C0661EF78D2E}" name="Resources">
+          <FILE id="C6U6hY" name="Texts_en.properties" compile="0" resource="1"
+                file="Source/modules/licensing/Resources/Texts_en.properties"/>
+          <FILE id="X00TbV" name="Texts_es.properties" compile="0" resource="1"
+                file="Source/modules/licensing/Resources/Texts_es.properties"/>
+          <FILE id="Cq1wUf" name="Texts_fr.properties" compile="0" resource="1"
+                file="Source/modules/licensing/Resources/Texts_fr.properties"/>
+        </GROUP>
+        <FILE id="ca3I9X" name="SoftwareLicensorStatus.cpp" compile="1" resource="0"
+              file="Source/modules/licensing/SoftwareLicensorStatus.cpp"/>
+        <FILE id="ONnied" name="SoftwareLicensorStatus.h" compile="0" resource="0"
+              file="Source/modules/licensing/SoftwareLicensorStatus.h"/>
+        <FILE id="kq1S1w" name="SoftwareLicensorUnlockForm.cpp" compile="1"
+              resource="0" file="Source/modules/licensing/SoftwareLicensorUnlockForm.cpp"/>
+        <FILE id="BlFawU" name="SoftwareLicensorUnlockForm.h" compile="0" resource="0"
+              file="Source/modules/licensing/SoftwareLicensorUnlockForm.h"/>
+      </GROUP>
+      <GROUP id="{FA47A134-E9C4-AF73-7C63-AF8F72898C82}" name="components">
+        <GROUP id="{F1E70AF9-1672-5CA7-DFE0-3894E4507614}" name="envelopeFollowers"/>
+        <GROUP id="{19C596F2-29C0-5558-9AA3-F5929DE82E0A}" name="filter"/>
+      </GROUP>
       <GROUP id="{E7928BC5-50D1-36E5-4127-5F7B92252771}" name="dsp">
         <FILE id="K37Nq8" name="EnvelopeProcessor.h" compile="0" resource="0"
               file="Source/modules/dsp/EnvelopeProcessor.h"/>
@@ -38,8 +59,9 @@
   <EXPORTFORMATS>
     <VS2022 targetFolder="Builds/VisualStudio2022">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Mojo Filter Debug Version"/>
-        <CONFIGURATION name="Release" targetName="Mofo Mojo Filter V1"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Mojo Filter Debug Version"
+                       libraryPath="&quot;C:\Users\somed\Documents\coding\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release&quot;"/>
+        <CONFIGURATION name="Release" targetName="Mofo Mojo Filter V1" libraryPath="&quot;C:\Users\somed\Documents\coding\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release&quot;"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_utils" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
@@ -56,6 +78,8 @@
         <MODULEPATH id="juce_audio_processors" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
         <MODULEPATH id="juce_audio_plugin_client" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
+        <MODULEPATH id="juce_product_unlocking" path="../../JUCE-7.0.7/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../JUCE-7.0.7/modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/MacOSX">
@@ -78,6 +102,8 @@
         <MODULEPATH id="juce_audio_processors" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
         <MODULEPATH id="juce_audio_plugin_client" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
+        <MODULEPATH id="juce_product_unlocking" path="../../JUCE-7.0.7/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../JUCE-7.0.7/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -90,6 +116,7 @@
     <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_cryptography" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
@@ -97,5 +124,7 @@
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_product_unlocking" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
   </MODULES>
 </JUCERPROJECT>
