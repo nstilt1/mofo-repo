@@ -5,7 +5,8 @@
 #include "PluginProcessor.h"
 #include "Knob.h" 
 #include "MagicKnob.h"
-#include "../Source/modules/licensing/SoftwareLicensorUnlockForm.h";
+#include <software_licensor_juce/software_licensor_juce.h>
+#include <software_licensor_juce/marketplace/SoftwareLicensorUnlockForm.h>
 
 class UnlockForm : public SoftwareLicensorUnlockForm
 {

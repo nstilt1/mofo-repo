@@ -13,7 +13,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include <math.h>
-#include "../Source/modules/licensing/SoftwareLicensorStatus.h";
+#include <software_licensor_juce/software_licensor_juce.h>
+#include <software_licensor_juce/marketplace/SoftwareLicensorStatus.h>
 
 class LicensingStatus : public SoftwareLicensorStatus
 {

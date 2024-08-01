@@ -12,16 +12,6 @@
               pluginCharacteristicsValue="pluginEditorRequiresKeys" version="1.0.5">
   <MAINGROUP id="Kqft8I" name="Mofo Mojo Filter V1">
     <GROUP id="{B5CA9F11-01E9-B0A3-1827-CD83DD008D6F}" name="modules">
-      <GROUP id="{BE9047F0-6BC7-4AB0-4417-98D4C11E4100}" name="licensing">
-        <FILE id="ca3I9X" name="SoftwareLicensorStatus.cpp" compile="1" resource="0"
-              file="Source/modules/licensing/SoftwareLicensorStatus.cpp"/>
-        <FILE id="ONnied" name="SoftwareLicensorStatus.h" compile="0" resource="0"
-              file="Source/modules/licensing/SoftwareLicensorStatus.h"/>
-        <FILE id="kq1S1w" name="SoftwareLicensorUnlockForm.cpp" compile="1"
-              resource="0" file="Source/modules/licensing/SoftwareLicensorUnlockForm.cpp"/>
-        <FILE id="BlFawU" name="SoftwareLicensorUnlockForm.h" compile="0" resource="0"
-              file="Source/modules/licensing/SoftwareLicensorUnlockForm.h"/>
-      </GROUP>
       <GROUP id="{FA47A134-E9C4-AF73-7C63-AF8F72898C82}" name="components">
         <GROUP id="{F1E70AF9-1672-5CA7-DFE0-3894E4507614}" name="envelopeFollowers"/>
         <GROUP id="{19C596F2-29C0-5558-9AA3-F5929DE82E0A}" name="filter"/>
@@ -49,11 +39,10 @@
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
   <EXPORTFORMATS>
-    <VS2022 targetFolder="Builds/VisualStudio2022" externalLibraries="Userenv.lib&#10;Ntdll.lib&#10;Bcrypt.lib&#10;Ws2_32.lib&#10;softwarelicensor.lib">
+    <VS2022 targetFolder="Builds/VisualStudio2022">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Mojo Filter Debug Version"
-                       libraryPath="&quot;C:\Users\somed\Documents\coding\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release&quot;"/>
-        <CONFIGURATION name="Release" targetName="Mofo Mojo Filter V1" libraryPath="&quot;C:\Users\somed\Documents\coding\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release&quot;"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Mojo Filter Debug Version"/>
+        <CONFIGURATION name="Release" targetName="Mofo Mojo Filter V1"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_utils" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
@@ -72,6 +61,7 @@
         <MODULEPATH id="juce_audio_formats" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
         <MODULEPATH id="juce_product_unlocking" path="../../JUCE-7.0.7/modules"/>
         <MODULEPATH id="juce_cryptography" path="../../JUCE-7.0.7/modules"/>
+        <MODULEPATH id="software_licensor_product_unlocking" path="../../software-licensor-client-side-library"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/MacOSX">
@@ -96,6 +86,7 @@
         <MODULEPATH id="juce_audio_formats" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
         <MODULEPATH id="juce_product_unlocking" path="../../JUCE-7.0.7/modules"/>
         <MODULEPATH id="juce_cryptography" path="../../JUCE-7.0.7/modules"/>
+        <MODULEPATH id="software_licensor_product_unlocking" path="../../software-licensor-client-side-library"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -118,5 +109,7 @@
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_product_unlocking" showAllCode="1" useLocalCopy="0"
             useGlobalPath="1"/>
+    <MODULE id="software_licensor_product_unlocking" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>
