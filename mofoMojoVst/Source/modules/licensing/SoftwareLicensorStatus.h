@@ -312,15 +312,15 @@ language: English
             juce::String fileContents = R"(
 language: French
 
-"licenseActivated" = "Votre licence a ÈtÈ activÈe avec succËs."
-"licenseNotFound" = "Aucune licence trouvÈe."
+"licenseActivated" = "Votre licence a √©t√© activ√©e avec succ√®s."
+"licenseNotFound" = "Aucune licence trouv√©e."
 "licenseMachineLimit" = "Votre licence a atteint la limite de machines."
-"trialEnded" = "Votre pÈriode d'essai est terminÈe."
+"trialEnded" = "Votre p√©riode d'essai est termin√©e."
 "licenseInactive" = "Votre licence n'est plus active."
-"offlineCodeIncorrect" = "Votre code hors ligne Ètait incorrect."
-"offlineCodesDisabled" = "Les codes hors ligne ne sont pas activÈs pour ce produit."
-"licenseCodeInvalid" = "Le code de licence Ètait invalide."
-"machineDeactivated" = "Cette machine a ÈtÈ dÈsactivÈe."
+"offlineCodeIncorrect" = "Votre code hors ligne √©tait incorrect."
+"offlineCodesDisabled" = "Les codes hors ligne ne sont pas activ√©s pour ce produit."
+"licenseCodeInvalid" = "Le code de licence √©tait invalide."
+"machineDeactivated" = "Cette machine a √©t√© d√©sactiv√©e."
 )";
             std::unique_ptr<juce::LocalisedStrings> strings(new juce::LocalisedStrings(fileContents, true));
             juce::LocalisedStrings::setCurrentMappings(strings.release());
@@ -331,14 +331,14 @@ language: French
 language: Spanish
 
 "licenseActivated" = "Su licencia ha sido activada exitosamente."
-"licenseNotFound" = "No se encontrÛ ninguna licencia."
-"licenseMachineLimit" = "Su licencia ha alcanzado el lÌmite de m·quinas."
+"licenseNotFound" = "No se encontr√≥ ninguna licencia."
+"licenseMachineLimit" = "Su licencia ha alcanzado el l√≠mite de m√°quinas."
 "trialEnded" = "Su prueba ha terminado."
-"licenseInactive" = "Su licencia ya no est· activa."
-"offlineCodeIncorrect" = "Su cÛdigo offline fue incorrecto."
-"offlineCodesDisabled" = "Los cÛdigos offline no est·n habilitados para este producto."
-"licenseCodeInvalid" = "El cÛdigo de licencia no es v·lido."
-"machineDeactivated" = "Esta m·quina ha sido desactivada."
+"licenseInactive" = "Su licencia ya no est√° activa."
+"offlineCodeIncorrect" = "Su c√≥digo offline fue incorrecto."
+"offlineCodesDisabled" = "Los c√≥digos offline no est√°n habilitados para este producto."
+"licenseCodeInvalid" = "El c√≥digo de licencia no es v√°lido."
+"machineDeactivated" = "Esta m√°quina ha sido desactivada."
 )";
             std::unique_ptr<juce::LocalisedStrings> strings(new juce::LocalisedStrings(fileContents, true));
             juce::LocalisedStrings::setCurrentMappings(strings.release());

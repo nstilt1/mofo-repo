@@ -13,14 +13,6 @@
   <MAINGROUP id="Kqft8I" name="Mofo Mojo Filter V1">
     <GROUP id="{B5CA9F11-01E9-B0A3-1827-CD83DD008D6F}" name="modules">
       <GROUP id="{BE9047F0-6BC7-4AB0-4417-98D4C11E4100}" name="licensing">
-        <GROUP id="{9CC1561D-6892-4062-A37F-C0661EF78D2E}" name="Resources">
-          <FILE id="C6U6hY" name="Texts_en.properties" compile="0" resource="1"
-                file="Source/modules/licensing/Resources/Texts_en.properties"/>
-          <FILE id="X00TbV" name="Texts_es.properties" compile="0" resource="1"
-                file="Source/modules/licensing/Resources/Texts_es.properties"/>
-          <FILE id="Cq1wUf" name="Texts_fr.properties" compile="0" resource="1"
-                file="Source/modules/licensing/Resources/Texts_fr.properties"/>
-        </GROUP>
         <FILE id="ca3I9X" name="SoftwareLicensorStatus.cpp" compile="1" resource="0"
               file="Source/modules/licensing/SoftwareLicensorStatus.cpp"/>
         <FILE id="ONnied" name="SoftwareLicensorStatus.h" compile="0" resource="0"
@@ -57,7 +49,7 @@
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
   <EXPORTFORMATS>
-    <VS2022 targetFolder="Builds/VisualStudio2022">
+    <VS2022 targetFolder="Builds/VisualStudio2022" externalLibraries="Userenv.lib&#10;Ntdll.lib&#10;Bcrypt.lib&#10;Ws2_32.lib&#10;softwarelicensor.lib">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Mojo Filter Debug Version"
                        libraryPath="&quot;C:\Users\somed\Documents\coding\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release&quot;"/>
