@@ -14,9 +14,8 @@
 #include <juce_dsp/juce_dsp.h>
 #include <math.h>
 #include <software_licensor_juce/software_licensor_juce.h>
-#include <software_licensor_juce/marketplace/SoftwareLicensorStatus.h>
 
-class LicensingStatus : public SoftwareLicensorStatus
+class LicensingStatus : public software_licensor::SoftwareLicensorStatus
 {
 public:
     juce::String getStoreId() override
