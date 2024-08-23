@@ -18,6 +18,7 @@ const char* SoftwareLicensorStatus::emailProp = "email";
 const char* SoftwareLicensorStatus::licenseTypeProp = "licenseType";
 const char* SoftwareLicensorStatus::versionProp = "version";
 const char* SoftwareLicensorStatus::errorProp = "error";
+const char* SoftwareLicensorStatus::licenseCodeProp = "licenseCode";
 static const char* stateTagName = "REG";
 
 SoftwareLicensorStatus::SoftwareLicensorStatus() : status(stateTagName)
@@ -29,6 +30,17 @@ SoftwareLicensorStatus::~SoftwareLicensorStatus()
 }
 
 void SoftwareLicensorStatus::update_machine_information(bool should_update) {
+    /**
+     * If your code breaks here, perhaps with an error like "*this* is 0xFFFFFFFFFF",
+     * ensure that the unlockForm member of your PluginEditor is being correctly initialized 
+     * in the constructor of the PluginEditor, particularly in the initializer list where it 
+     * might say:
+     * MyProcessorEditor::MyProcessorEditor(MyAudioProcessor& p)
+     *  : AudioProcessorEditor(&p), audioProcessor(p), unlockForm(audioProcessor.unlockStatus)
+     * 
+     * If it specifically says `audioProcessor.unlockStatus`, you may get this error. Instead 
+     * use unlockForm(p.unlockStatus), or whatever variable name you have for the MyAudioProcessor&
+     */
     juce::String companyName = this->getCompanyName();
     auto companyNamePtr = companyName.getCharPointer();
     auto osName = juce::SystemStats::getOperatingSystemName().getCharPointer();

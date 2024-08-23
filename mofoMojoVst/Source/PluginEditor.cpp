@@ -93,6 +93,11 @@ void MofoFilterAudioProcessorEditor::redrawButtons()
     if (audioProcessor.unlockStatus.isUnlocked())
     {
         unlockButton.setVisible(false);
+        notification.setVisible(false);
+        if (versionNotification.isNewVersionAvailable())
+            versionNotification.setVisible(true);
+        else
+            versionNotification.setVisible(false);
     }
     else
     {
@@ -236,7 +241,8 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
     resonanceTension("Adjust the tension for the resonance envelope.", "resonanceTension"),
     volume("", "volume"),     
     mixer("Controls the dry/wet ratio", "mix"),
-    unlockForm(p.unlockStatus, "Please enter your license code", true)
+    unlockForm(p.unlockStatus, "Please enter your license code", true, unlockButton, notification),
+    versionNotification(p.unlockStatus)
 {
     audioProcessor.unlockStatus.check_license_with_no_api_request();
     juce::Rectangle<int> r = juce::Desktop::getInstance().getDisplays().getTotalBounds(true);
@@ -622,6 +628,22 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
 
     addAndMakeVisible (mixer);
     mixerAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (audioProcessor.treeState, "mix", mixer);
+
+    addAndMakeVisible(notification);
+    addAndMakeVisible(versionNotification);
+    if (!audioProcessor.unlockStatus.isUnlocked())
+    {
+        notification.setVisible(true);
+        notification.setText(audioProcessor.unlockStatus.getMessage());
+    }
+    else 
+    {
+        notification.setVisible(false);
+        if (versionNotification.isNewVersionAvailable())
+            versionNotification.setVisible(true);
+        else
+            versionNotification.setVisible(false);
+    }
 }
 
 void MofoFilterAudioProcessorEditor::buttonClicked(juce::Button* button)
@@ -791,8 +813,26 @@ void MofoFilterAudioProcessorEditor::resized()
     speedDirectionUp.setBounds(getWidth() * 0.05f * 14.45f, getWidth() * 0.05f * 4.1f, size * 0.84f, size * 0.32f);
     speedDirectionDown.setBounds(speedDirectionUp.getX(), speedDirectionUp.getY() + speedDirectionUp.getHeight() - 2, speedDirectionUp.getWidth(), size * 0.32f);
 
+    auto notificationHeight = getHeight() * 0.1f;
+
     if (!audioProcessor.unlockStatus.isUnlocked())
+    {
         unlockButton.setBounds(volume.getX(), driveDirectionDown.getY(), volume.getWidth(), size * 0.33f);
+        notification.setBounds(getWidth() * 0.25, getHeight() - notificationHeight, getWidth() / 2, notificationHeight);
+        notification.setText(audioProcessor.unlockStatus.getMessage());
+    }
+    else
+    {
+        if (versionNotification.isNewVersionAvailable())
+        {
+            versionNotification.setBounds(getWidth() * 0.25, getHeight() - notificationHeight, getWidth() / 2, notificationHeight);
+            versionNotification.setVisible(true);
+        }
+        else
+        {
+            versionNotification.setVisible(false);
+        }
+    }
 
     unlockForm.setBounds(drive.getX() - 200, drive.getY() - 150, 400, 300);
 }
