@@ -732,7 +732,7 @@ void MofoFilterAudioProcessorEditor::buttonClicked(juce::Button* button)
         speedDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
         speedDirection.setValue(0);
     }
-    else if (button = &unlockButton)
+    else if (button == &unlockButton)
     {
         unlockForm.setVisible(true);
         unlockForm.enterModalState();
