@@ -336,9 +336,10 @@ void MofoFilterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             chainSettings.speedTension, 
             chainSettings.cutoffAmount, 
             chainSettings.speedAmount + chainSettings.cutoffAmount,
-            32.f,
+            10.f,
             chainSettings.speedIsUp
         );
+        amount = std::pow(2.f, amount / 2.f);
 
         newDrive = envelope(
             volumeRatio,
@@ -493,7 +494,7 @@ ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& treeState)
     settings.cutoff = treeState.getRawParameterValue("cutoff")->load();
     settings.minCutoff = treeState.getRawParameterValue("minCutoff")->load();
 
-    settings.cutoffAmount = std::pow(2.f, treeState.getRawParameterValue("cutoffAmount")->load() / 2.f);
+    settings.cutoffAmount = treeState.getRawParameterValue("cutoffAmount")->load();
     settings.resonance = treeState.getRawParameterValue("resonance")->load() / 10.f;
     settings.resonanceAmount = treeState.getRawParameterValue("resonanceAmount")->load() / 10.f;
     settings.cutoffTension = treeState.getRawParameterValue("cutoffTension")->load() + 0.5f;
@@ -516,7 +517,7 @@ ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& treeState)
         settings.driveTension = 0.01f;
     else if (settings.driveTension == 1.f)
         settings.driveTension = 0.99f;
-    settings.speedAmount = std::pow(2.f,treeState.getRawParameterValue("speedAmount")->load() / 2.f) - 1.f;
+    settings.speedAmount = treeState.getRawParameterValue("speedAmount")->load();
     settings.is2Pole = treeState.getRawParameterValue("is2Pole")->load();
     settings.isHighPass = treeState.getRawParameterValue("isHighPass")->load();
     settings.isAuto = treeState.getRawParameterValue("isAuto")->load();
