@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "modules/dsp/EnvelopeProcessor.h"
 
 //==============================================================================
 MofoFilterAudioProcessor::MofoFilterAudioProcessor() 
@@ -199,7 +200,7 @@ void MofoFilterAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     mix.prepare (spec);
     mix.reset ();
     mix.setMixingRule (juce::dsp::DryWetMixingRule::linear);
-    mix.setWetLatency (256);
+    mix.setWetLatency (2);
     mix.setWetMixProportion (chainSettings.mix);
 }
 
@@ -273,16 +274,11 @@ void MofoFilterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     float newRes;
     float newDrive;
 
-    float maxDrive = chainSettings.maxDrive;
-    float am = chainSettings.amount;
-    float maxRes = chainSettings.maxResonance;
-    float maxSpeed = chainSettings.maxSpeed;
-
     mix.setWetMixProportion (chainSettings.mix);
     mix.pushDrySamples (buffer);
     
     // process envelopes
-    if (maxDrive != 0.f || maxRes != 0.f || am != 1.f || maxSpeed != 0.f)
+    if (chainSettings.driveAmount != 0.f || chainSettings.resonanceAmount != 0.f || chainSettings.cutoffAmount != 1.f || chainSettings.speedAmount != 0.f)
     {
         float frequency;
         if (chainSettings.isAuto == 1)
@@ -310,40 +306,20 @@ void MofoFilterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         if (max < currentVolume)
             max = currentVolume;
 
-        float ratio;
+        float volumeRatio;
         if (max != 0)
-            ratio = currentVolume / max;
+            volumeRatio = currentVolume / max;
         else
-            ratio = 0.000000001f;
+            volumeRatio = 0.000000001f;
 
-        float resRatio = 0.5f;
-        if (maxRes != 0.f)
-            resRatio = curveConvert (ratio, chainSettings.resShape);
-
-        float driveRatio = 0.5f;
-        if (maxDrive != 0)
-            driveRatio = curveConvert (ratio, chainSettings.driveShape);
-
-        float speedRatio = 0.5f;
-        if (am != 1.f || maxSpeed != 0.f)
-        {
-            speedRatio = curveConvert (ratio, chainSettings.speedShape);
-            ratio = curveConvert (ratio, chainSettings.shape);
-        }
-
-        float resonance = chainSettings.resonance;
-
-        if (maxRes != 0.f)
-        {
-            if (resonance + maxRes > 1) maxRes = 1;
-            else maxRes = resonance + maxRes;
-            if (chainSettings.resIsUp)
-                newRes = maxRes - ((maxRes - resonance) * resRatio);
-            else
-                newRes = resonance + ((maxRes - resonance) * resRatio);
-        }
-        else
-            newRes = resonance;
+        newRes = envelope(
+            volumeRatio,
+            chainSettings.resonanceTension,
+            chainSettings.resonance,
+            chainSettings.resonanceAmount + chainSettings.resonance,
+            1.f,
+            chainSettings.resIsUp
+        );
 
 
         // So, this part is kind of hard to conceptualize and describe.
@@ -351,64 +327,49 @@ void MofoFilterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         // The "speed" is an envelope which is (still) based on the volume/max ratio, but it is applied to the "cutoff amount". 
         //
         // I wasn't sure what to call this, so I refer to it as "speed". I'm sure there's a more technical term.
-        float amount = chainSettings.amount;
-        float maxAmount = chainSettings.maxSpeed;
-        if (maxAmount != 0)
-            if (maxAmount != 0)
-            {
-                if (amount + maxAmount > 32) maxAmount = 32;
-                else maxAmount = amount + maxAmount;
-                if (treeState.getRawParameterValue ("speedIsUp")->load ())
-                    amount = maxAmount - ((maxAmount - amount) * speedRatio);
-                else amount = amount + ((maxAmount - amount) * speedRatio);
-            }
+        
+        // process the "speed" envelope on the cutoff envelope
+        float amount = envelope(
+            volumeRatio, 
+            chainSettings.speedTension, 
+            chainSettings.cutoffAmount, 
+            chainSettings.speedAmount + chainSettings.cutoffAmount,
+            32.f,
+            chainSettings.speedIsUp
+        );
 
-        float drive = chainSettings.drive;
+        newDrive = envelope(
+            volumeRatio,
+            chainSettings.driveTension,
+            chainSettings.drive,
+            chainSettings.driveAmount + chainSettings.drive,
+            100.f,
+            chainSettings.driveIsUp
+        );
 
-        if (maxDrive != 0)
+        if (chainSettings.isAuto == 1)
         {
-            if (drive + maxDrive > 100) maxDrive = 100;
-            else maxDrive = drive + maxDrive;
-            if (chainSettings.driveIsUp)
-                newDrive = maxDrive - ((maxDrive - drive) * driveRatio);
-            else 
-                newDrive = drive + ((maxDrive - drive) * driveRatio);
+            float baseValue = juce::jmax(20.f, chainSettings.minCutoff * frequency);
+            newFreq = envelope(
+                volumeRatio,
+                chainSettings.cutoffTension,
+                baseValue,
+                baseValue * amount,
+                18000.f,
+                chainSettings.freqIsUp
+            );
         }
-        else newDrive = drive;
-
-        if (amount != 1.f)
-            if (chainSettings.isAuto == 1)
-            {
-                float minC = chainSettings.minCutoff * frequency;
-                float maxC = minC * amount;
-
-                if (maxC > 18000) maxC = 18000;
-                float difference = maxC - minC;
-                if (chainSettings.freqIsUp == 1)
-                    newFreq = maxC - (difference * ratio);
-                else
-                    newFreq = (difference * ratio) + minC;
-            }
-            else
-            {
-                float cut = chainSettings.cutoff;
-                float am = amount * cut;;
-                if (am > 18000)
-                {
-                    am = 18000;
-                }
-                float difference = am - cut;
-
-                if (chainSettings.freqIsUp)
-                    newFreq = am - (difference * ratio);
-                else
-                    newFreq = (difference * ratio) + cut;
-            }
-        else
-            if (chainSettings.isAuto == 1)
-                newFreq = chainSettings.minCutoff * frequency;
-            else
-                newFreq = chainSettings.cutoff;
+        else 
+        {
+            newFreq = envelope(
+                volumeRatio,
+                chainSettings.cutoffTension,
+                chainSettings.cutoff,
+                amount * chainSettings.cutoff,
+                18000.f,
+                chainSettings.freqIsUp
+            );
+        }
 
         if (newFreq > 18000)
             newFreq = 18000;
@@ -426,19 +387,15 @@ void MofoFilterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         if (newFreq <= 0)
             newFreq = 20;
         ladderFilter.setCutoffFrequencyHz (newFreq);
-        
-        juce::dsp::AudioBlock<float> block (buffer);
-        auto processingContext = juce::dsp::ProcessContextReplacing<float> (block);
-        ladderFilter.process (processingContext);
-
-        gain.process (processingContext);
-
-        mix.mixWetSamples (processingContext.getOutputBlock ());
     }
-    else
-    {
-        MofoFilterAudioProcessor::processBlockBypassed (buffer, midiMessages);
-    }
+
+    juce::dsp::AudioBlock<float> block(buffer);
+    auto processingContext = juce::dsp::ProcessContextReplacing<float>(block);
+    ladderFilter.process(processingContext);
+
+    gain.process(processingContext);
+
+    mix.mixWetSamples(processingContext.getOutputBlock());
 }
 
 // Function called when parameter is changed
@@ -525,43 +482,41 @@ ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& treeState)
 
     settings.drive = treeState.getRawParameterValue("drive")->load();
 
-    settings.maxDrive = treeState.getRawParameterValue("maxDrive")->load();
+    settings.driveAmount = treeState.getRawParameterValue("driveAmount")->load();
     settings.cutoff = treeState.getRawParameterValue("cutoff")->load();
     settings.minCutoff = treeState.getRawParameterValue("minCutoff")->load();
 
-
-    settings.amount = std::pow(2.f, treeState.getRawParameterValue("amount")->load() / 2.f);
+    settings.cutoffAmount = std::pow(2.f, treeState.getRawParameterValue("cutoffAmount")->load() / 2.f);
     settings.resonance = treeState.getRawParameterValue("resonance")->load() / 10.f;
-    settings.maxResonance = treeState.getRawParameterValue("maxResonance")->load() / 10.f;
-    settings.shape = treeState.getRawParameterValue("shape")->load() + 0.5f;
-    if (settings.shape == 0.0f)
-        settings.shape = 0.01f;
-    else if (settings.shape == 1.f)
-        settings.shape = 0.99f;
-    settings.speedShape = treeState.getRawParameterValue("speedShape")->load() + 0.5f;
-    if (settings.speedShape == 0.0f)
-        settings.speedShape = 0.01f;
-    else if (settings.speedShape == 1.f)
-        settings.speedShape = 0.99f; 
-    settings.resShape = treeState.getRawParameterValue("resShape")->load() + 0.5f;
-    if (settings.resShape == 0.0f)
-        settings.resShape = 0.01f;
-    else if (settings.resShape == 1.f)
-        settings.resShape = 0.99f;
-    settings.driveShape = treeState.getRawParameterValue("driveShape")->load() + 0.5f;
-    if (settings.driveShape == 0.0f)
-        settings.driveShape = 0.01f;
-    else if (settings.driveShape == 1.f)
-        settings.driveShape = 0.99f;
-    settings.maxSpeed = std::pow(2.f,treeState.getRawParameterValue("maxSpeed")->load() / 2.f) - 1.f;
+    settings.resonanceAmount = treeState.getRawParameterValue("resonanceAmount")->load() / 10.f;
+    settings.cutoffTension = treeState.getRawParameterValue("cutoffTension")->load() + 0.5f;
+    if (settings.cutoffTension == 0.0f)
+        settings.cutoffTension = 0.01f;
+    else if (settings.cutoffTension == 1.f)
+        settings.cutoffTension = 0.99f;
+    settings.speedTension = treeState.getRawParameterValue("speedTension")->load() + 0.5f;
+    if (settings.speedTension == 0.0f)
+        settings.speedTension = 0.01f;
+    else if (settings.speedTension == 1.f)
+        settings.speedTension = 0.99f;
+    settings.resonanceTension = treeState.getRawParameterValue("resonanceTension")->load() + 0.5f;
+    if (settings.resonanceTension == 0.0f)
+        settings.resonanceTension = 0.01f;
+    else if (settings.resonanceTension == 1.f)
+        settings.resonanceTension = 0.99f;
+    settings.driveTension = treeState.getRawParameterValue("driveTension")->load() + 0.5f;
+    if (settings.driveTension == 0.0f)
+        settings.driveTension = 0.01f;
+    else if (settings.driveTension == 1.f)
+        settings.driveTension = 0.99f;
+    settings.speedAmount = std::pow(2.f,treeState.getRawParameterValue("speedAmount")->load() / 2.f) - 1.f;
     settings.is2Pole = treeState.getRawParameterValue("is2Pole")->load();
     settings.isHighPass = treeState.getRawParameterValue("isHighPass")->load();
     settings.isAuto = treeState.getRawParameterValue("isAuto")->load();
-    settings.freqIsUp = treeState.getRawParameterValue("freqIsUp")->load();
-    settings.resIsUp = treeState.getRawParameterValue("resIsUp")->load();
-    settings.amountIsUp = treeState.getRawParameterValue("amountIsUp")->load();
-    settings.driveIsUp = treeState.getRawParameterValue("driveIsUp")->load();
-    settings.speedIsUp = treeState.getRawParameterValue("speedIsUp")->load();
+    settings.freqIsUp = treeState.getRawParameterValue("freqDirection")->load();
+    settings.resIsUp = treeState.getRawParameterValue("resDirection")->load();
+    settings.driveIsUp = treeState.getRawParameterValue("driveDirection")->load();
+    settings.speedIsUp = treeState.getRawParameterValue("speedDirection")->load();
     settings.volume = treeState.getRawParameterValue("volume")->load();
     settings.mix = treeState.getRawParameterValue ("mix")->load ();
 
@@ -582,146 +537,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout MofoFilterAudioProcessor::cr
     juce::StringArray speedDirection = { "Down", "Up" };
     juce::StringArray paramDirection = { "Down", "Up" };
 
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "is2Pole", 1 }, "Slope", polarChoices, 1, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "isHighPass", 1 }, "Filter Type", filterChoices, 0, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "isAuto", 1 }, "Cutoff Frequency Mode", modeChoices, 0, ""));                                                                                       
-    layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{"drive", 1}, "Drive", juce::NormalisableRange<float>(1.f, 100.f, 0.1f, 1), 8));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "volume", 1}, "Volume", juce::NormalisableRange<float> (-30.f, 30.f, 0.1f, 1), -5));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "maxDrive", 1 }, "Drive Follower", juce::NormalisableRange<float> (0.f, 100.f, 0.1f, 1), 0));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "cutoff", 1 }, "Classic Mode Cutoff (Hz)", juce::NormalisableRange<float> (20.f, 16000.f, 1.f, 0.25f), 190.f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "minCutoff", 1 }, "Auto Mode Cutoff (Harmonics)", 0.01, 20, 3));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "amount", 1 }, "Cutoff Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 7));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "resonance", 1 }, "Resonance", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 7.f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "maxResonance", 1 }, "Resonance Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 0));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "shape", 1 }, "Shape", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "speedShape", 1 }, "Shape", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "resShape", 1 }, "Shape", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "driveShape", 1 }, "Shape", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "maxSpeed", 1 }, "Speed Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 0));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "freqIsUp", 1 }, "Frequency Envelope Direction", freqDirection, 0, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "resIsUp", 1 }, "Resonance Envelope Direction", resDirection, 1, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "amountIsUp", 1 }, "Amount Envelope Direction", amountDirection, 1, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "speedIsUp", 1 }, "Speed Envelope Direction", speedDirection, 1, ""));
-    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "driveIsUp", 1 }, "Drive Envelope Direction", driveDirection, 1, ""));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{ "mix", 1 }, "Mix", juce::NormalisableRange<float> (0.f, 1.f, 0.01f), 1));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "is2Pole",          3 }, "Slope", polarChoices, 1, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "isHighPass",       3 }, "Filter Type", filterChoices, 0, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "isAuto",           3 }, "Cutoff Frequency Mode", modeChoices, 0, ""));                                                                                       
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{"drive",             3 }, "Drive", juce::NormalisableRange<float>(1.f, 100.f, 0.1f, 1), 8));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "volume",           3 }, "Volume", juce::NormalisableRange<float> (-30.f, 30.f, 0.1f, 1), -5));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "driveAmount",      3 }, "Drive Envelope Amount", juce::NormalisableRange<float> (0.f, 100.f, 0.1f, 1), 0));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "cutoff",           3 }, "Classic Mode Cutoff (Hz)", juce::NormalisableRange<float> (20.f, 16000.f, 1.f, 0.25f), 190.f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "minCutoff",        3 }, "Auto Mode Cutoff (Harmonics)", 0.01, 20, 3));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "cutoffAmount",     3 }, "Cutoff Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 7));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "resonance",        3 }, "Resonance", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 7.f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "resonanceAmount",  3 }, "Resonance Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 0));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "cutoffTension",    3 }, "Cutoff envelope tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "speedTension",     3 }, "Speed envelope tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "resonanceTension", 3 }, "Resonance Envelope Tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "driveTension",     3 }, "Drive Envelope Tension", juce::NormalisableRange<float> (-0.5f, 0.5f, 0.01f, 1), 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "speedAmount",      3 }, "Speed Envelope Amount", juce::NormalisableRange<float> (0.f, 10.f, 0.1f, 1), 0));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "freqDirection",    3 }, "Cutoff frequency Envelope Direction", freqDirection, 0, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "resDirection",     3 }, "Resonance Envelope Direction", resDirection, 1, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "speedDirection",   3 }, "Speed Envelope Direction", speedDirection, 1, ""));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{ "driveDirection",   3 }, "Drive Envelope Direction", driveDirection, 1, ""));
+    layout.add (std::make_unique<juce::AudioParameterFloat>  (juce::ParameterID{ "mix",              3 }, "Mix", juce::NormalisableRange<float> (0.f, 1.f, 0.01f), 1));
     ChainSettings settings;
     return layout;
 }
-
-
-/*/
-
-juce::AudioProcessorValueTreeState::ParameterLayout Mothereffer1AudioProcessor::createParameters()
-{
-    //juce::AudioParameterBool* isHighPass;
-    //bool previousIsHighPass;
-
-    //juce::AudioParameterFloat* harmonicThreshold;
-    //bool previousHarmonicThreshold;
-
-    //juce::AudioParameterFloat* threshold;
-    //float previousThreshold;
-
-    //juce::AudioParameterFloat* drive;
-    //float previousDrive;
-
-    //juce::AudioParameterFloat* mix;
-    //float previousMix;
-
-    //juce::AudioParameterFloat* cutoff;
-    //float previousCutoff;
-
-    //juce::AudioParameterFloat* minCutoff;
-    //float previousMinCutoff;
-
-    //juce::AudioParameterFloat* maxCutoff;
-    //float previousMaxCutoff;
-
-    //juce::AudioParameterFloat* amount;
-    //float previousAmount;
-
-    //juce::AudioParameterFloat* resonance;
-    //float previousResonance;
-
-    //juce::AudioParameterFloat* speed;
-    //float previousSpeed;
-
-    //juce::AudioParameterBool* is2Pole;
-    //bool previousIs2Pole;
-
-    //juce::AudioParameterBool* freqIsUp;
-    //bool previousFreqIsUp;
-
-    //juce::AudioParameterBool* resIsUp;
-    //bool previousResIsUp;
-
-
-    juce::StringArray polarChoices = { "4-pole", "2-pole" };
-    juce::StringArray filterChoices = { "LP", "HP" };
-    juce::StringArray modeChoices = { "Classic", "Auto" };
-    juce::StringArray freqDirection = { "Down", "Up" };
-    juce::StringArray resDirection = { "Down", "Up" };
-    juce::StringArray amountDirection = { "Down", "Up" };
-    juce::StringArray driveDirection = { "Down", "Up" };
-    juce::StringArray speedDirection = { "Down", "Up" };
-
-
-
-        
-    
-
-
-    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params; 
-
-
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("is2Pole", "Half/Full", polarChoices, 1, "Half/Full"));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("isHighPass", "Filter Type", filterChoices, 0, "LP/HP"));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("isAuto", "Frequency Mode", filterChoices, 0, "Frequency Mode"));
-
-
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("harmonicThreshold", "Harmonic Threshold", 0, 1, 0.88));
-
-    
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("threshold", "Threshold", 0, 1, 0.3));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("drive", "Drive", 0.01, 25, 4));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("maxDrive", "Drive EF Amount", 0, 25, 4));
-    
-
-    //params.push_back(std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0, 1, 1));
-    //params.push_back(std::make_unique<juce::AudioParameterFloat>("maxMix", "Max Mix", 0, 1, 1));
-
-    
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("cutoff", "Cutoff", juce::NormalisableRange<float>(20.f, 16000.f, 1.f, 0.25f),250.f));
-
-    //params.push_back(std::make_unique<juce::AudioParameterFloat>("cutoff", "Cutoff", 20, 16000, 250));
-
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("minCutoff", "Minimum Cutoff", 0.01, 10, 3));
-    
-
-    //params.push_back(std::make_unique<juce::AudioParameterFloat>("maxCutoff", "Maximum Cutoff", 1, 10, 8));
-
-    
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("amount", "Amount", 1, 32, 32));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("maxAmount", "Amount EF Amt.", 0, 9, 0));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("resonance", "Resonance", 0, 10, 6));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("maxResonance", "Resonance EF Amt.", 0, 10, 6));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("speed", "Speed", 0, 1, 0));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("maxSpeed", "Speed EF Amt.", 0, 1, 0));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("freqIsUp", "Frequency EF Direction", freqDirection, 1, "Frequency EF Direction"));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("resIsUp", "Resonance EF Direction", resDirection, 1, "Frequency EF Direction"));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("amountIsUp", "Amount EF Direction", amountDirection, 1, "Amount EF Direction"));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("speedIsUp", "Speed EF Direction", speedDirection, 1, "Speed EF Direction"));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>("driveIsUp", "Drive EF Direction", driveDirection, 1, "Drive EF Direction"));
-    
-
-    //params.push_back(std::make_unique<juce::AudioParameterBool>("mixIsUp", "Mix Follower Direction", true, "Mix Follower Direction"));
-    //params.push_back(std::make_unique<juce::AudioParameter>("", "", , , ));
-
-
-
-
-    return { params.begin(), params.end() };
-
-    
-}
-//*/

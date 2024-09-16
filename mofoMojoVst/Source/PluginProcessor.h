@@ -18,11 +18,63 @@ struct ParamTree
     juce::ValueTree node;
 };
 
+/**
+ * @struct ChainSettings
+ * @brief Settings for audio processing chain.
+ *
+ * @var ChainSettings::drive
+ * Initial drive level.
+ * @var ChainSettings::cutoff
+ * Initial cutoff frequency setting.
+ * @var ChainSettings::minCutoff
+ * Minimum allowed cutoff frequency.
+ * ...
+ * @var ChainSettings::is2Pole
+ * Toggle for 2-pole filter mode (0 for off, 1 for on).
+ * ...
+ */
 struct ChainSettings 
 {
-    float drive{ 0 }, cutoff{ 0 }, minCutoff{ 0 }, resonance{ 0 }, volume{ 0 }, mix{ 0 };
-    float amount{ 0 }, maxResonance{ 0 }, shape{ 0 }, resShape{ 0 }, driveShape{ 0 }, speedShape{ 0 }, maxSpeed{ 0 }, maxDrive{ 0 };
-    int is2Pole{ 0 }, isHighPass{ 0 }, isAuto{ 0 }, freqIsUp{ 0 }, resIsUp{ 0 }, amountIsUp{ 0 }, driveIsUp{ 0 }, speedIsUp{ 0 };
+    // The drive level
+    float drive{ 0 };
+    // The classic cutoff frequency
+    float cutoff{ 0 };
+    // the auto cutoff knob value n, where n needs to be multiplied with the detected
+    // pitch to obtain a frequency
+    float minCutoff{ 0 };
+    // the resonance knob's value between 0.0 and 10.0; the Ladder Filter will require
+    // this value to be normalized, between 0 and 1.
+    float resonance{ 0 };
+    // the output volume knob
+    float volume{ 0 };
+    // the mix ratio
+    float mix{ 0 };
+    // the cutoff amount knob, measured in +0.5 octaves
+    float cutoffAmount{ 0 };
+    // the resonance amount knob
+    float resonanceAmount{ 0 };
+    // the cutoff envelope tension
+    float cutoffTension{ 0 };
+    // the resonance envelope tension
+    float resonanceTension{ 0 };
+    // the drive envelope tension
+    float driveTension{ 0 };
+    // the tension for the envelope that affects the cutoff amount
+    float speedTension{ 0 };
+    // the envelope amount for the envelope that affects the cutoff envelope amount
+    float speedAmount{ 0 };
+    // the envelope amount for the drive's envelope
+    float driveAmount{ 0 };
+    int is2Pole{ 0 };
+    int isHighPass{ 0 };
+    // whether the "Auto" mode is selected
+    int isAuto{ 0 };
+    // direction of the cutoff envelope
+    int freqIsUp{ 0 };
+    // direction of the resonance envelope
+    int resIsUp{ 0 };
+    int driveIsUp{ 0 };
+    int speedIsUp{ 0 };
 };
 
 ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& treeState);

@@ -64,69 +64,69 @@ void MofoFilterAudioProcessorEditor::redrawButtons()
     {
         is2Pole4.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    if (audioProcessor.treeState.getRawParameterValue("freqIsUp")->load() < 0.5f)
+    if (audioProcessor.treeState.getRawParameterValue("freqDirection")->load() < 0.5f)
     {
-        freqIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        freqDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        freqIsUpUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+        freqDirectionUp.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    if (audioProcessor.treeState.getRawParameterValue("freqIsUp")->load() > 0.5f)
+    if (audioProcessor.treeState.getRawParameterValue("freqDirection")->load() > 0.5f)
     {
-        freqIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
-    }
-    else
-    {
-        freqIsUpDown.setToggleState(true, juce::NotificationType::dontSendNotification);
-    }
-    if (audioProcessor.treeState.getRawParameterValue("resIsUp")->load() < 0.5f)
-    {
-        resIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        freqDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        resIsUpUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+        freqDirectionDown.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    if (audioProcessor.treeState.getRawParameterValue("resIsUp")->load() > 0.5f)
+    if (audioProcessor.treeState.getRawParameterValue("resDirection")->load() < 0.5f)
     {
-        resIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
-    }
-    else
-    {
-        resIsUpDown.setToggleState(true, juce::NotificationType::dontSendNotification);
-    }
-    if (audioProcessor.treeState.getRawParameterValue("driveIsUp")->load() < 0.5f)
-    {
-        driveIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        resDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        driveIsUpUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+        resDirectionUp.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    if (audioProcessor.treeState.getRawParameterValue("driveIsUp")->load() > 0.5f)
+    if (audioProcessor.treeState.getRawParameterValue("resDirection")->load() > 0.5f)
     {
-        driveIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
-    }
-    else
-    {
-        driveIsUpDown.setToggleState(true, juce::NotificationType::dontSendNotification);
-    }
-    if (audioProcessor.treeState.getRawParameterValue("speedIsUp")->load() < 0.5f)
-    {
-        speedIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        resDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        speedIsUpUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+        resDirectionDown.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    if (audioProcessor.treeState.getRawParameterValue("speedIsUp")->load() > 0.5f)
+    if (audioProcessor.treeState.getRawParameterValue("driveDirection")->load() < 0.5f)
     {
-        speedIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+        driveDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        speedIsUpDown.setToggleState(true, juce::NotificationType::dontSendNotification);
+        driveDirectionUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+    }
+    if (audioProcessor.treeState.getRawParameterValue("driveDirection")->load() > 0.5f)
+    {
+        driveDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+    }
+    else
+    {
+        driveDirectionDown.setToggleState(true, juce::NotificationType::dontSendNotification);
+    }
+    if (audioProcessor.treeState.getRawParameterValue("speedDirection")->load() < 0.5f)
+    {
+        speedDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+    }
+    else
+    {
+        speedDirectionUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+    }
+    if (audioProcessor.treeState.getRawParameterValue("speedDirection")->load() > 0.5f)
+    {
+        speedDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+    }
+    else
+    {
+        speedDirectionDown.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
     if (audioProcessor.treeState.getRawParameterValue("isAuto")->load() < 0.5f)
     {
@@ -153,11 +153,20 @@ void MofoFilterAudioProcessorEditor::timerCallback ()
 
 //==============================================================================
 MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioProcessor& p)
-    : AudioProcessorEditor(&p), audioProcessor(p), drive("", "drive"),
-    minFrequency("Cutoff frequency for Auto Mode", "minCutoff"), amount("", "amount"), cutoffFrequency("Cutoff frequency for Classic Mode", "cutoff"),
-    resonance("", "resonance"), resonanceAmt("", "maxResonance"), volume("", "volume"), driveAmt("", "maxDrive"), speedAmt("Envelope follower for the cutoff amount", "maxSpeed"),
-    shape("Adjust the tension for the cutoff envelope.", "shape"), resShape("Adjust the tension for the resonance envelope.", "resShape"), 
-    driveShape("Adjust the tension for the drive envelope", "driveShape"), speedShape("Adjust the tension for the sepeed envelope", "speedShape"), 
+    : AudioProcessorEditor(&p), audioProcessor(p), 
+    drive("", "drive"),
+    driveAmount("", "driveAmount"),
+    driveTension("Adjust the tension for the drive envelope", "driveTension"),
+    minFrequency("Cutoff frequency for Auto Mode", "minCutoff"),
+    cutoffFrequency("Cutoff frequency for Classic Mode", "cutoff"),
+    cutoffAmount("Envelope follower for the cutoff frequency.", "cutoffAmount"),
+    cutoffTension("Adjust the tension for the cutoff envelope.", "cutoffTension"),
+    speedAmount("Envelope follower for the cutoff envelope", "speedAmount"),
+    speedTension("Adjust the tension for the speed envelope", "speedTension"),
+    resonance("", "resonance"), 
+    resonanceAmt("", "resonanceAmount"),
+    resonanceTension("Adjust the tension for the resonance envelope.", "resonanceTension"),
+    volume("", "volume"),     
     mixer("Controls the dry/wet ratio", "mix")
 {
     juce::Rectangle<int> r = juce::Desktop::getInstance().getDisplays().getTotalBounds(true);
@@ -248,152 +257,152 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
 
     juce::String tooltipSuffix = " (is diminuendo).";
 
-    // FREQISUP
-    freqIsUpUp.setButtonText("Up");
-    freqIsUpUp.setRadioGroupId(freq);
-    freqIsUpUp.setTooltip("The cutoff envelope follower sweeps up when the instrument has a decaying tone" + tooltipSuffix);
-    freqIsUpUp.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
-    if (audioProcessor.treeState.getRawParameterValue("freqIsUp")->load() < 0.5f)
+    // freqDirection
+    freqDirectionUp.setButtonText("Up");
+    freqDirectionUp.setRadioGroupId(freq);
+    freqDirectionUp.setTooltip("The cutoff envelope follower sweeps up when the instrument has a decaying tone" + tooltipSuffix);
+    freqDirectionUp.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
+    if (audioProcessor.treeState.getRawParameterValue("freqDirection")->load() < 0.5f)
     {
-        freqIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        freqDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        freqIsUpUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+        freqDirectionUp.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    freqIsUpUp.addListener(this);
-    addAndMakeVisible(freqIsUpUp);
+    freqDirectionUp.addListener(this);
+    addAndMakeVisible(freqDirectionUp);
 
-    freqIsUpDown.setButtonText("Down");
-    freqIsUpDown.setRadioGroupId(freq);
-    freqIsUpDown.setTooltip("The cutoff envelope follower sweeps down when the instrument has a decaying tone" + tooltipSuffix);
-    freqIsUpDown.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnTop);
-    if (audioProcessor.treeState.getRawParameterValue("freqIsUp")->load() > 0.5f)
+    freqDirectionDown.setButtonText("Down");
+    freqDirectionDown.setRadioGroupId(freq);
+    freqDirectionDown.setTooltip("The cutoff envelope follower sweeps down when the instrument has a decaying tone" + tooltipSuffix);
+    freqDirectionDown.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnTop);
+    if (audioProcessor.treeState.getRawParameterValue("freqDirection")->load() > 0.5f)
     {
-        freqIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+        freqDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        freqIsUpDown.setToggleState(true, juce::NotificationType::dontSendNotification);
+        freqDirectionDown.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    freqIsUpDown.addListener(this);
-    addAndMakeVisible(freqIsUpDown);
+    freqDirectionDown.addListener(this);
+    addAndMakeVisible(freqDirectionDown);
 
     
-    addAndMakeVisible(freqIsUp);
+    addAndMakeVisible(freqDirection);
 
-    freqIsUpAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "freqIsUp", freqIsUp);
+    freqDirectionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "freqDirection", freqDirection);
 
 
-    //RESISUP
-    resIsUpUp.setButtonText("Up");
-    resIsUpUp.setRadioGroupId(res);
-    resIsUpUp.setTooltip("The resonance envelope follower sweeps up when the instrument has a decaying tone" + tooltipSuffix);
-    resIsUpUp.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
-    if (audioProcessor.treeState.getRawParameterValue("resIsUp")->load() < 0.5f)
+    //resDirection
+    resDirectionUp.setButtonText("Up");
+    resDirectionUp.setRadioGroupId(res);
+    resDirectionUp.setTooltip("The resonance envelope follower sweeps up when the instrument has a decaying tone" + tooltipSuffix);
+    resDirectionUp.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
+    if (audioProcessor.treeState.getRawParameterValue("resDirection")->load() < 0.5f)
     {
-        resIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        resDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        resIsUpUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+        resDirectionUp.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    resIsUpUp.addListener(this);
-    addAndMakeVisible(resIsUpUp);
+    resDirectionUp.addListener(this);
+    addAndMakeVisible(resDirectionUp);
 
-    resIsUpDown.setButtonText("Down");
-    resIsUpDown.setRadioGroupId(res);
-    resIsUpDown.setTooltip("The resonance envelope follower sweeps down when the instrument has a decaying tone" + tooltipSuffix);
-    resIsUpDown.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnTop);
-    if (audioProcessor.treeState.getRawParameterValue("resIsUp")->load() > 0.5f)
+    resDirectionDown.setButtonText("Down");
+    resDirectionDown.setRadioGroupId(res);
+    resDirectionDown.setTooltip("The resonance envelope follower sweeps down when the instrument has a decaying tone" + tooltipSuffix);
+    resDirectionDown.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnTop);
+    if (audioProcessor.treeState.getRawParameterValue("resDirection")->load() > 0.5f)
     {
-        resIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+        resDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        resIsUpDown.setToggleState(true, juce::NotificationType::dontSendNotification);
+        resDirectionDown.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    resIsUpDown.addListener(this);
-    addAndMakeVisible(resIsUpDown);
+    resDirectionDown.addListener(this);
+    addAndMakeVisible(resDirectionDown);
 
-    addAndMakeVisible(resIsUp);
+    addAndMakeVisible(resDirection);
 
-    resIsUpAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "resIsUp", resIsUp);
+    resDirectionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "resDirection", resDirection);
 
-    //DRIVEISUP
-    driveIsUpUp.setButtonText("Up");
-    driveIsUpUp.setRadioGroupId(drivee);
-    driveIsUpUp.setTooltip("The drive envelope follower sweeps up when the instrument has a decaying tone" + tooltipSuffix);
-    driveIsUpUp.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
-    if (audioProcessor.treeState.getRawParameterValue("driveIsUp")->load() < 0.5f)
+    //driveDirection
+    driveDirectionUp.setButtonText("Up");
+    driveDirectionUp.setRadioGroupId(drivee);
+    driveDirectionUp.setTooltip("The drive envelope follower sweeps up when the instrument has a decaying tone" + tooltipSuffix);
+    driveDirectionUp.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
+    if (audioProcessor.treeState.getRawParameterValue("driveDirection")->load() < 0.5f)
     {
-        driveIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        driveDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        driveIsUpUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+        driveDirectionUp.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    driveIsUpUp.addListener(this);
-    addAndMakeVisible(driveIsUpUp);
+    driveDirectionUp.addListener(this);
+    addAndMakeVisible(driveDirectionUp);
 
-    driveIsUpDown.setButtonText("Down");
-    driveIsUpDown.setRadioGroupId(drivee);
-    driveIsUpDown.setTooltip("The drive envelope follower sweeps down when the instrument has a decaying tone" + tooltipSuffix);
-    driveIsUpDown.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnTop);
-    if (audioProcessor.treeState.getRawParameterValue("driveIsUp")->load() > 0.5f)
+    driveDirectionDown.setButtonText("Down");
+    driveDirectionDown.setRadioGroupId(drivee);
+    driveDirectionDown.setTooltip("The drive envelope follower sweeps down when the instrument has a decaying tone" + tooltipSuffix);
+    driveDirectionDown.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnTop);
+    if (audioProcessor.treeState.getRawParameterValue("driveDirection")->load() > 0.5f)
     {
-        driveIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+        driveDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        driveIsUpDown.setToggleState(true, juce::NotificationType::dontSendNotification);
+        driveDirectionDown.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    driveIsUpDown.addListener(this);
-    addAndMakeVisible(driveIsUpDown);
+    driveDirectionDown.addListener(this);
+    addAndMakeVisible(driveDirectionDown);
 
-    addAndMakeVisible(driveIsUp);
+    addAndMakeVisible(driveDirection);
 
-    driveIsUpAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "driveIsUp", driveIsUp);
+    driveDirectionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "driveDirection", driveDirection);
 
-    //SPEEDISUP
-    speedIsUpUp.setButtonText("Up");
-    speedIsUpUp.setRadioGroupId(speeed);
-    speedIsUpUp.setTooltip("This one's tricky... The cutoff envelope follower's upper bound sweeps downwards when the instrument has a decaying tone" + tooltipSuffix);
-    speedIsUpUp.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
-    if (audioProcessor.treeState.getRawParameterValue("speedIsUp")->load() < 0.5f)
+    //speedDirection
+    speedDirectionUp.setButtonText("Up");
+    speedDirectionUp.setRadioGroupId(speeed);
+    speedDirectionUp.setTooltip("This one's tricky... The cutoff envelope follower's upper bound sweeps downwards when the instrument has a decaying tone" + tooltipSuffix);
+    speedDirectionUp.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
+    if (audioProcessor.treeState.getRawParameterValue("speedDirection")->load() < 0.5f)
     {
-        speedIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        speedDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        speedIsUpUp.setToggleState(true, juce::NotificationType::dontSendNotification);
+        speedDirectionUp.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    speedIsUpUp.addListener(this);
-    addAndMakeVisible(speedIsUpUp);
+    speedDirectionUp.addListener(this);
+    addAndMakeVisible(speedDirectionUp);
 
-    speedIsUpDown.setButtonText("Down");
-    speedIsUpDown.setRadioGroupId(speeed);
-    speedIsUpUp.setTooltip("This one's tricky... The cutoff envelope follower's upper bound sweeps upwards when the instrument has a decaying tone" + tooltipSuffix);
-    speedIsUpDown.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnTop);
-    if (audioProcessor.treeState.getRawParameterValue("speedIsUp")->load() > 0.5f)
+    speedDirectionDown.setButtonText("Down");
+    speedDirectionDown.setRadioGroupId(speeed);
+    speedDirectionUp.setTooltip("This one's tricky... The cutoff envelope follower's upper bound sweeps upwards when the instrument has a decaying tone" + tooltipSuffix);
+    speedDirectionDown.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnTop);
+    if (audioProcessor.treeState.getRawParameterValue("speedDirection")->load() > 0.5f)
     {
-        speedIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+        speedDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
     }
     else
     {
-        speedIsUpDown.setToggleState(true, juce::NotificationType::dontSendNotification);
+        speedDirectionDown.setToggleState(true, juce::NotificationType::dontSendNotification);
     }
-    speedIsUpDown.addListener(this);
-    addAndMakeVisible(speedIsUpDown);
+    speedDirectionDown.addListener(this);
+    addAndMakeVisible(speedDirectionDown);
 
-    addAndMakeVisible(speedIsUp);
+    addAndMakeVisible(speedDirection);
 
-    speedIsUpAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "speedIsUp", speedIsUp);
+    speedDirectionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "speedDirection", speedDirection);
 
     // ISAUTO
     isAutoOn.setButtonText("Auto");
     isAutoOn.setRadioGroupId(Auto);
-    isAutoOn.setTooltip("Sets the cutoff mode to auto, setting the cutoff frequency in harmonics of the current lowest note played. 1 = fundamental frequency.");
+    isAutoOn.setTooltip("Sets the cutoff mode to auto, setting the cutoff frequency in harmonics of the current lowest note played. 1 is the estimated fundamental frequency.");
     isAutoOn.setConnectedEdges(juce::Button::ConnectedEdgeFlags::ConnectedOnBottom);
     if (audioProcessor.treeState.getRawParameterValue("isAuto")->load() < 0.5f)
     {
@@ -451,13 +460,13 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
     addAndMakeVisible(cutoffFrequency);
     cutoffAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "cutoff", cutoffFrequency);
 
-    amount.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    amount.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 16);
-    amount.setLookAndFeel(&knob);
-    amount.setTooltip("Sets the upper bound of the envelope follower, units are +(half octaves).");
-    addAndMakeVisible(amount);
+    cutoffAmount.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    cutoffAmount.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 16);
+    cutoffAmount.setLookAndFeel(&knob);
+    cutoffAmount.setTooltip("Sets the upper bound of the cutoff envelope follower, units are +(half octaves).");
+    addAndMakeVisible(cutoffAmount);
 
-    amountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "amount", amount);
+    cutoffAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "cutoffAmount", cutoffAmount);
    
     resonance.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
     resonance.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
@@ -473,23 +482,23 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
     resonanceAmt.setTooltip("Sets the upper bound of the resonance sweeping.");
     addAndMakeVisible(resonanceAmt);
 
-    maxResonanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "maxResonance", resonanceAmt);
+    resonanceAmtAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "resonanceAmount", resonanceAmt);
 
-    driveAmt.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    driveAmt.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 16);
-    driveAmt.setLookAndFeel(&knob);
-    driveAmt.setTooltip("Sets the upper bound of the drive sweeping.");
-    addAndMakeVisible(driveAmt);
+    driveAmount.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    driveAmount.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 16);
+    driveAmount.setLookAndFeel(&knob);
+    driveAmount.setTooltip("Sets the upper bound of the drive sweeping.");
+    addAndMakeVisible(driveAmount);
 
-    maxDriveAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "maxDrive", driveAmt);
+    driveAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "driveAmount", driveAmount);
 
-    speedAmt.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    speedAmt.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    speedAmt.setLookAndFeel(&knob);
-    speedAmt.setTooltip("Sets the upper bound of the cutoffs follower's upper bound.");
-    addAndMakeVisible(speedAmt);
+    speedAmount.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    speedAmount.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    speedAmount.setLookAndFeel(&knob);
+    speedAmount.setTooltip("Sets the upper bound of the cutoff envelope follower's upper bound.");
+    addAndMakeVisible(speedAmount);
 
-    maxSpeedAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "maxSpeed", speedAmt);
+    speedAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "speedAmount", speedAmount);
 
     volume.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
     volume.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 16);
@@ -499,37 +508,37 @@ MofoFilterAudioProcessorEditor::MofoFilterAudioProcessorEditor(MofoFilterAudioPr
 
     volumeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "volume", volume);
 
-    shape.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    shape.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    shape.setLookAndFeel(&center);
-    shape.setTooltip("Changes the shape that the cutoff follower responds with. 0 = linear");
-    addAndMakeVisible(shape);
+    cutoffTension.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    cutoffTension.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    cutoffTension.setLookAndFeel(&center);
+    cutoffTension.setTooltip("Changes the tension that the cutoff envelope follower responds with. 0 = linear");
+    addAndMakeVisible(cutoffTension);
 
-    shapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "shape", shape);
+    cutoffTensionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "cutoffTension", cutoffTension);
 
-    resShape.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    resShape.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    resShape.setLookAndFeel(&center);
-    resShape.setTooltip("Changes the shape that the resonance follower responds with. 0 = linear");
-    addAndMakeVisible(resShape);
+    resonanceTension.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    resonanceTension.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    resonanceTension.setLookAndFeel(&center);
+    resonanceTension.setTooltip("Changes the tension that the resonance envelope follower responds with. 0 = linear");
+    addAndMakeVisible(resonanceTension);
 
-    resShapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "resShape", resShape);
+    resonanceTensionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "resonanceTension", resonanceTension);
 
-    driveShape.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    driveShape.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    driveShape.setLookAndFeel(&center);
-    driveShape.setTooltip("Changes the shape that the drive follower responds with. 0 = linear");
-    addAndMakeVisible(driveShape);
+    driveTension.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    driveTension.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    driveTension.setLookAndFeel(&center);
+    driveTension.setTooltip("Changes the tension that the drive envelope follower responds with. 0 = linear");
+    addAndMakeVisible(driveTension);
 
-    driveShapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "driveShape", driveShape);
+    driveTensionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "driveTension", driveTension);
 
-    speedShape.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    speedShape.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
-    speedShape.setLookAndFeel(&center);
-    speedShape.setTooltip("Changes the shape that the speed follower responds with. 0 = linear");
-    addAndMakeVisible(speedShape);
+    speedTension.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    speedTension.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 16);
+    speedTension.setLookAndFeel(&center);
+    speedTension.setTooltip("Changes the tension that the speed envelope follower responds with. 0 = linear");
+    addAndMakeVisible(speedTension);
 
-    speedShapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "speedShape", speedShape);
+    speedTensionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.treeState, "speedTension", speedTension);
 
     addAndMakeVisible (mixer);
     mixerAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (audioProcessor.treeState, "mix", mixer);
@@ -573,53 +582,53 @@ void MofoFilterAudioProcessorEditor::buttonClicked(juce::Button* button)
         isAutoOn.setToggleState(false, juce::NotificationType::dontSendNotification);
         isAuto.setValue(0);
     }
-    else if (button == &freqIsUpUp)
+    else if (button == &freqDirectionUp)
     {
         button->setToggleState(true, juce::NotificationType::dontSendNotification);
-        freqIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
-        freqIsUp.setValue(1);
+        freqDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+        freqDirection.setValue(1);
     }
-    else if (button == &freqIsUpDown)
+    else if (button == &freqDirectionDown)
     {
         button->setToggleState(true, juce::NotificationType::dontSendNotification);
-        freqIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
-        freqIsUp.setValue(0);
+        freqDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        freqDirection.setValue(0);
     }
-    else if (button == &resIsUpUp)
+    else if (button == &resDirectionUp)
     {
         button->setToggleState(true, juce::NotificationType::dontSendNotification);
-        resIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
-        resIsUp.setValue(1);
+        resDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+        resDirection.setValue(1);
     }
-    else if (button == &resIsUpDown)
+    else if (button == &resDirectionDown)
     {
         button->setToggleState(true, juce::NotificationType::dontSendNotification);
-        resIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
-        resIsUp.setValue(0);
+        resDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        resDirection.setValue(0);
     }
-    else if (button == &driveIsUpUp)
+    else if (button == &driveDirectionUp)
     {
         button->setToggleState(true, juce::NotificationType::dontSendNotification);
-        driveIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
-        driveIsUp.setValue(1);
+        driveDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+        driveDirection.setValue(1);
     }
-    else if (button == &driveIsUpDown)
+    else if (button == &driveDirectionDown)
     {
         button->setToggleState(true, juce::NotificationType::dontSendNotification);
-        driveIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
-        driveIsUp.setValue(0);
+        driveDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        driveDirection.setValue(0);
     }
-    else if (button == &speedIsUpUp)
+    else if (button == &speedDirectionUp)
     {
         button->setToggleState(true, juce::NotificationType::dontSendNotification);
-        speedIsUpDown.setToggleState(false, juce::NotificationType::dontSendNotification);
-        speedIsUp.setValue(1);
+        speedDirectionDown.setToggleState(false, juce::NotificationType::dontSendNotification);
+        speedDirection.setValue(1);
     }
-    else if (button == &speedIsUpDown)
+    else if (button == &speedDirectionDown)
     {
         button->setToggleState(true, juce::NotificationType::dontSendNotification);
-        speedIsUpUp.setToggleState(false, juce::NotificationType::dontSendNotification);
-        speedIsUp.setValue(0);
+        speedDirectionUp.setToggleState(false, juce::NotificationType::dontSendNotification);
+        speedDirection.setValue(0);
     }
 }
 
@@ -667,32 +676,32 @@ void MofoFilterAudioProcessorEditor::resized()
     mixer.setBounds (getWidth () * 0.05f * 9.f, getWidth () * 0.05f * 1.3f, size, size);
 
     //cutoff amount 12,2
-    amount.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 2.0f, size * 0.8f, size * 0.8f);
+    cutoffAmount.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 2.0f, size * 0.8f, size * 0.8f);
     resonanceAmt.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 6.13f, size * 0.8f, size * 0.8f);
 
     //driveAmt 11.75, 5.25
-    driveAmt.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 8.32f, size * 0.8f, size * 0.8f);
+    driveAmount.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 8.32f, size * 0.8f, size * 0.8f);
 
     //speedAmt 11.75, 7.25
-    speedAmt.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 3.95f, size * 0.8f, size * 0.8f);
+    speedAmount.setBounds(getWidth() * 0.05f * 11.8f, getWidth() * 0.05f * 3.95f, size * 0.8f, size * 0.8f);
 
-    shape.setBounds(getWidth() * 0.05f * 17.05f, getWidth() * 0.05f * 2.0f, size * 0.8f, size * 0.8f);
+    cutoffTension.setBounds(getWidth() * 0.05f * 17.05f, getWidth() * 0.05f * 2.0f, size * 0.8f, size * 0.8f);
 
-    speedShape.setBounds(getWidth() * 0.05f * 17.05f, getWidth() * 0.05f * 3.95f, size * 0.8f, size * 0.8f);
+    speedTension.setBounds(getWidth() * 0.05f * 17.05f, getWidth() * 0.05f * 3.95f, size * 0.8f, size * 0.8f);
 
-    resShape.setBounds(speedShape.getX(), resonanceAmt.getY(), size * 0.8f, size * 0.8f);
+    resonanceTension.setBounds(speedTension.getX(), resonanceAmt.getY(), size * 0.8f, size * 0.8f);
 
-    driveShape.setBounds(speedShape.getX(), driveAmt.getY(), size * 0.8f, size * 0.8f);
+    driveTension.setBounds(speedTension.getX(), driveAmount.getY(), size * 0.8f, size * 0.8f);
 
-    freqIsUpUp.setBounds(getWidth() * 0.05f * 14.45f, getWidth() * 0.05f * 2.08f, size * 0.84f, size * 0.32f);
-    freqIsUpDown.setBounds(freqIsUpUp.getX(), freqIsUpUp.getY() + freqIsUpUp.getHeight(), freqIsUpUp.getWidth(), size * 0.32f);
+    freqDirectionUp.setBounds(getWidth() * 0.05f * 14.45f, getWidth() * 0.05f * 2.08f, size * 0.84f, size * 0.32f);
+    freqDirectionDown.setBounds(freqDirectionUp.getX(), freqDirectionUp.getY() + freqDirectionUp.getHeight(), freqDirectionUp.getWidth(), size * 0.32f);
 
-    resIsUpUp.setBounds(getWidth() * 0.05f * 14.45f, getWidth() * 0.05f * 6.25f, size * 0.84f, size * 0.32f);
-    resIsUpDown.setBounds(resIsUpUp.getX(), resIsUpUp.getY() + resIsUpUp.getHeight() - 2, resIsUpUp.getWidth(), size * 0.32f);
+    resDirectionUp.setBounds(getWidth() * 0.05f * 14.45f, getWidth() * 0.05f * 6.25f, size * 0.84f, size * 0.32f);
+    resDirectionDown.setBounds(resDirectionUp.getX(), resDirectionUp.getY() + resDirectionUp.getHeight() - 2, resDirectionUp.getWidth(), size * 0.32f);
 
-    driveIsUpUp.setBounds(resIsUpUp.getX(), getWidth() * 0.05f * 8.5f, size * 0.84f, size * 0.32f);
-    driveIsUpDown.setBounds(driveIsUpUp.getX(), driveIsUpUp.getY() + driveIsUpUp.getHeight(), driveIsUpUp.getWidth(), size * 0.32f);
+    driveDirectionUp.setBounds(resDirectionUp.getX(), getWidth() * 0.05f * 8.5f, size * 0.84f, size * 0.32f);
+    driveDirectionDown.setBounds(driveDirectionUp.getX(), driveDirectionUp.getY() + driveDirectionUp.getHeight(), driveDirectionUp.getWidth(), size * 0.32f);
 
-    speedIsUpUp.setBounds(getWidth() * 0.05f * 14.45f, getWidth() * 0.05f * 4.1f, size * 0.84f, size * 0.32f);
-    speedIsUpDown.setBounds(speedIsUpUp.getX(), speedIsUpUp.getY() + speedIsUpUp.getHeight() - 2, speedIsUpUp.getWidth(), size * 0.32f);
+    speedDirectionUp.setBounds(getWidth() * 0.05f * 14.45f, getWidth() * 0.05f * 4.1f, size * 0.84f, size * 0.32f);
+    speedDirectionDown.setBounds(speedDirectionUp.getX(), speedDirectionUp.getY() + speedDirectionUp.getHeight() - 2, speedDirectionUp.getWidth(), size * 0.32f);
 }
