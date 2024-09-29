@@ -13,14 +13,6 @@
   <MAINGROUP id="Kqft8I" name="Mofo Mojo Filter V1">
     <GROUP id="{B5CA9F11-01E9-B0A3-1827-CD83DD008D6F}" name="modules">
       <GROUP id="{BE9047F0-6BC7-4AB0-4417-98D4C11E4100}" name="licensing">
-        <GROUP id="{9CC1561D-6892-4062-A37F-C0661EF78D2E}" name="Resources">
-          <FILE id="C6U6hY" name="Texts_en.properties" compile="0" resource="1"
-                file="Source/modules/licensing/Resources/Texts_en.properties"/>
-          <FILE id="X00TbV" name="Texts_es.properties" compile="0" resource="1"
-                file="Source/modules/licensing/Resources/Texts_es.properties"/>
-          <FILE id="Cq1wUf" name="Texts_fr.properties" compile="0" resource="1"
-                file="Source/modules/licensing/Resources/Texts_fr.properties"/>
-        </GROUP>
         <FILE id="ca3I9X" name="SoftwareLicensorStatus.cpp" compile="1" resource="0"
               file="Source/modules/licensing/SoftwareLicensorStatus.cpp"/>
         <FILE id="ONnied" name="SoftwareLicensorStatus.h" compile="0" resource="0"
@@ -84,8 +76,10 @@
     </VS2022>
     <XCODE_MAC targetFolder="Builds/MacOSX">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Filter"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="Mofo Mojo Filter v1"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Filter" libraryPath="/Users/somedooby/Documents/coding/JUCE_code/software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal/"
+                       extraLinkerFlags="-Wl,-ld_classic" defines="JUCE_SILENCE_XCODE_15_LINKER_WARNING"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="Mofo Mojo Filter v1" libraryPath="/Users/somedooby/Documents/coding/JUCE_code/software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal/"
+                       extraLinkerFlags="-Wl,-ld_classic" defines="JUCE_SILENCE_XCODE_15_LINKER_WARNING"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_utils" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>

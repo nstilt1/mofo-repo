@@ -46,7 +46,12 @@ add_subdirectory(modules/JUCE-7.0.7)
 #find_package(JUCE CONFIG REQUIRED)
 
 # Link the Rust library
-find_library(RUST_LIBRARY NAMES rust software_licensor_static_rust_lib PATHS ${CMAKE_SOURCE_DIR}/../../software-licensor-client-side-library/software_licensor_static_rust_lib/target/x86_64-pc-windows-msvc/release)
+if(WIN32)
+	find_library(RUST_LIBRARY NAMES software_licensor_static_rust_lib PATHS ${CMAKE_SOURCE_DIR}/../../software-licensor-client-side-library/software_licensor_static_rust_lib/target/x86_64-pc-windows-msvc/release)
+else()
+	find_library(RUST_LIBRARY NAMES libsoftwarelicensor PATHS ${CMAKE_SOURCE_DIR}/../../software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal)
+endif()
+
 if(NOT RUST_LIBRARY)
     message(FATAL_ERROR "Rust library not found")
 endif()
