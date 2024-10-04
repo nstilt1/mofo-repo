@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="qwaGvK" name="Mofo Mojo Filter V1" projectType="audioplug"
+<JUCERPROJECT id="qwaGvK" name="The Mofo's Mojo v1" projectType="audioplug"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" displaySplashScreen="1"
               jucerFormatVersion="1" pluginFormats="buildAU,buildAUv3,buildStandalone,buildVST3"
               bundleIdentifier="com.alteredbrainchemistry.MofoMojoFilter" splashScreenColour="Dark"
               companyWebsite="https://alteredbrainchemistry.com" companyName="Altered Brain Chemistry"
-              pluginName="Mofo Mojo Filter V1" pluginDesc="Envelope Filter Plugin"
+              pluginName="The Mofo's Mojo v1" pluginDesc="Envelope Filter Plugin"
               pluginManufacturer="Altered Brain Chemistry" pluginCode="Mojo"
               pluginManufacturerCode="Abch" pluginAUMainType="'aufx'" pluginAUIsSandboxSafe="1"
               pluginVST3Category="Filter,Fx" cppLanguageStandard="17" companyEmail="somedooby@alteredbrainchemistry.com"
               pluginCharacteristicsValue="pluginEditorRequiresKeys" version="1.0.5">
-  <MAINGROUP id="Kqft8I" name="Mofo Mojo Filter V1">
+  <MAINGROUP id="Kqft8I" name="The Mofo's Mojo v1">
     <GROUP id="{B5CA9F11-01E9-B0A3-1827-CD83DD008D6F}" name="modules">
       <GROUP id="{BE9047F0-6BC7-4AB0-4417-98D4C11E4100}" name="licensing">
         <FILE id="ca3I9X" name="SoftwareLicensorStatus.cpp" compile="1" resource="0"
@@ -51,9 +51,9 @@
   <EXPORTFORMATS>
     <VS2022 targetFolder="Builds/VisualStudio2022" externalLibraries="Userenv.lib&#10;Ntdll.lib&#10;Bcrypt.lib&#10;Ws2_32.lib&#10;softwarelicensor.lib">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Mojo Filter Debug Version"
+        <CONFIGURATION isDebug="1" name="Debug" targetName="The Mofo's Mojo v1 Debug Version"
                        libraryPath="&quot;C:\Users\somed\Documents\coding\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release&quot;"/>
-        <CONFIGURATION name="Release" targetName="Mofo Mojo Filter V1" libraryPath="&quot;C:\Users\somed\Documents\coding\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release&quot;"/>
+        <CONFIGURATION name="Release" targetName="The Mofo's Mojo v1" libraryPath="&quot;C:\Users\somed\Documents\coding\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release&quot;"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_utils" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
@@ -74,10 +74,11 @@
         <MODULEPATH id="juce_cryptography" path="../../JUCE-7.0.7/modules"/>
       </MODULEPATHS>
     </VS2022>
-    <XCODE_MAC targetFolder="Builds/MacOSX">
+    <XCODE_MAC targetFolder="Builds/MacOSX" appSandbox="0" hardenedRuntime="1"
+               externalLibraries="softwarelicensor">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="Mofo Filter"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="Mofo Mojo Filter v1"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="The Mofo's Mojo v1"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="The Mofo's Mojo v1" libraryPath="/Users/somedooby/Documents/coding/JUCE_code/software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_utils" path="../../../Desktop/Coding/Libraries/JUCE-7.0.12/modules"/>
