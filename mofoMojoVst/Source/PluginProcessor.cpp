@@ -104,7 +104,7 @@ float MofoFilterAudioProcessor::getFFTData()
 //==============================================================================
 const juce::String MofoFilterAudioProcessor::getName() const
 {
-    return "Mofo Mojo Filter";
+    return "The Mofo's Mojo v1";
 }
 
 bool MofoFilterAudioProcessor::acceptsMidi() const
