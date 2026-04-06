@@ -35,6 +35,12 @@ public:
         productIdsAndPubkeys.push_back("MOFOm8PT-fnstNGIJsV8YK3oJttfR3u0L;BB6c3F67C2jK7i+PVXIZR9H8hrcRyw6DfFq82I5Ugmf6jaoM1c+aig3FR6KQjz4h8q84nA5MNXe3d/zWtoMBSLHb10uaDrtlh3YMtfZrUUtashHMrmYNA65nl7P7+7vf0Q==");
         return productIdsAndPubkeys;
     }
+    
+    juce::String getPrimaryProductId() override
+    {
+        auto s = juce::String("MOFOm8PT-fnstNGIJsV8YK3oJttfR3u0L");
+        return s;
+    }
 };
 
 struct ParamTree

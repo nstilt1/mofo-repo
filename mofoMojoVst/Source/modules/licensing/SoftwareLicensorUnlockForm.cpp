@@ -141,7 +141,7 @@ SoftwareLicensorUnlockForm::SoftwareLicensorUnlockForm(SoftwareLicensorStatus& s
         juce::String fileContents = R"(
 language: French
 
-"Sharing your hardware information allows us to design software that is more tailored for the average computer." = "Partager vos informations matérielles nous permet de concevoir des logiciels mieux adaptés à l'ordinateur moyen."
+"Sharing your hardware information allows us to design software that is more tailored for the average computer." = "Partager vos informations matÃ©rielles nous permet de concevoir des logiciels mieux adaptÃ©s Ã  l'ordinateur moyen."
 )";
         std::unique_ptr<juce::LocalisedStrings> strings(new juce::LocalisedStrings(fileContents, true));
         juce::LocalisedStrings::setCurrentMappings(strings.release());
@@ -150,7 +150,7 @@ language: French
         juce::String fileContents = R"(
 language: Spanish
 
-"Sharing your hardware information allows us to design software that is more tailored for the average computer." = "Compartir la información de su hardware nos permite diseñar software que se adapta mejor al ordenador promedio."
+"Sharing your hardware information allows us to design software that is more tailored for the average computer." = "Compartir la informaciÃ³n de su hardware nos permite diseÃ±ar software que se adapta mejor al ordenador promedio."
 )";
         std::unique_ptr<juce::LocalisedStrings> strings(new juce::LocalisedStrings(fileContents, true));
         juce::LocalisedStrings::setCurrentMappings(strings.release());
