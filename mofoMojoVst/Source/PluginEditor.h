@@ -7,7 +7,7 @@
 #include "MagicKnob.h"
 #include "../Source/modules/licensing/SoftwareLicensorUnlockForm.h";
 
-const juce::String clientVersion = "1.0.7";
+const juce::String clientVersion = "1.0.8";
 
 /**
  * @brief A license status notification that only shows when the software is locked.
