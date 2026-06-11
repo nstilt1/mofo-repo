@@ -36,3 +36,6 @@ mofoMojoVst/build
 *.exe
 *.out
 *.app
+
+# Misc
+zip.sh

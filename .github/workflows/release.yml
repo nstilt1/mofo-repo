@@ -1,0 +1,772 @@
+name: Mofo Mojo Release Build
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+    paths:
+      - 'mofoMojoVst/**'
+      - '.github/workflows/mofo-mojo-release.yml'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "yes" to confirm manual release'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  SLUG: the-mofos-mojo
+  RELEASE_API: ${{ secrets.RELEASE_API_URL }}
+  AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+  AWS_REGION: us-east-1
+  # Path to the .jucer file, relative to the repo root
+  JUCER_FILE: mofoMojoVst/Mofo Filter.jucer
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 1: Build the Rust static library for macOS (universal)
+# Re-run this job alone if the Rust build breaks; later jobs depend on its artifact.
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  build-rust-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone software-licensor-client-side-library
+        run: |
+          git clone https://github.com/nstilt1/software-licensor-client-side-library \
+            ../software-licensor-client-side-library
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust build (macOS)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ../software-licensor-client-side-library/software_licensor_static_rust_lib/target
+          key: rust-macos-${{ hashFiles('../software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
+          restore-keys: rust-macos-
+
+      - name: Build universal Rust static library (macOS)
+        working-directory: ../software-licensor-client-side-library/software_licensor_static_rust_lib
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+
+          cargo build --release --features logging --target aarch64-apple-darwin
+          cargo build --release --features logging --target x86_64-apple-darwin
+
+          mkdir -p target/universal
+          lipo -create -o target/universal/libsoftwarelicensor.a \
+            target/aarch64-apple-darwin/release/libsoftwarelicensor.a \
+            target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+
+          echo "Universal library built:"
+          lipo -info target/universal/libsoftwarelicensor.a
+
+      - name: Upload Rust macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-lib-macos
+          path: ../software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal/libsoftwarelicensor.a
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 2: Build the Rust static library for Windows (x86_64-pc-windows-msvc)
+# ─────────────────────────────────────────────────────────────────────────────
+  build-rust-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone software-licensor-client-side-library
+        shell: bash
+        run: |
+          git clone https://github.com/nstilt1/software-licensor-client-side-library \
+            ../software-licensor-client-side-library
+
+      - name: Install Rust stable (Windows MSVC)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust build (Windows)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.cargo\registry
+            ~\.cargo\git
+            ..\software-licensor-client-side-library\software_licensor_static_rust_lib\target
+          key: rust-windows-${{ hashFiles('../software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
+          restore-keys: rust-windows-
+
+      - name: Build Rust static library (Windows)
+        working-directory: ..\software-licensor-client-side-library\software_licensor_static_rust_lib
+        shell: pwsh
+        run: |
+          cargo build --release --features logging --target x86_64-pc-windows-msvc
+          Write-Host "Windows Rust library built:"
+          Get-Item target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+
+      - name: Upload Rust Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-lib-windows
+          path: ..\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 3: Build, sign, and package for Windows
+# ─────────────────────────────────────────────────────────────────────────────
+  build-windows:
+    needs: build-rust-windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from .jucer file
+        shell: bash
+        run: |
+          VERSION=$(python3 -c "
+          import re, sys
+          with open('mofoMojoVst/Mofo Filter.jucer', encoding='utf-8') as f:
+              content = f.read()
+          m = re.search(r'version=\"([^\"]+)\"', content)
+          if not m:
+              sys.exit('Could not find version in .jucer file')
+          print(m.group(1))
+          ")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Detected version: $VERSION"
+
+      - name: Download Rust Windows library
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-lib-windows
+          path: rust-lib-windows/
+
+      - name: Install CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Install MSVC build tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure CMake (Windows)
+        shell: pwsh
+        run: |
+          $rustLib = (Resolve-Path "rust-lib-windows\softwarelicensor.lib").Path
+          cmake -S mofoMojoVst -B build-windows `
+            -G "Ninja" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DRUST_LIBRARY_PATH="$rustLib"
+
+      - name: Build VST3 (Windows)
+        shell: pwsh
+        run: |
+          cmake --build build-windows --config Release --target ViatorJuceCMake_VST3
+          # Find the built VST3
+          $vst3 = Get-ChildItem -Recurse build-windows -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $vst3) {
+            # JUCE sometimes outputs a directory bundle on Windows
+            $vst3 = Get-ChildItem -Recurse build-windows -Directory -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $vst3) { Write-Error "VST3 bundle not found after build"; exit 1 }
+          echo "VST3_PATH=$($vst3.FullName)" >> $env:GITHUB_ENV
+          Write-Host "Built VST3 at: $($vst3.FullName)"
+
+      - name: Install trusted-signing-cli
+        shell: pwsh
+        run: |
+          # Cache key already handles install caching via actions/cache above;
+          # here we just ensure it's present.
+          cargo install trusted-signing-cli --version 0.9.0 --quiet 2>$null || true
+          $cargoBin = "$env:USERPROFILE\.cargo\bin"
+          echo "$cargoBin" >> $env:GITHUB_PATH
+
+      - name: Sign VST3 (Windows — Azure Trusted Signing)
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
+        run: |
+          # Sign the inner DLL inside the VST3 bundle
+          $dll = Get-ChildItem -Recurse "$env:VST3_PATH" -Filter "*.vst3" -File | Select-Object -First 1
+          if (-not $dll) {
+            # Some JUCE builds output a flat .vst3 DLL rather than a bundle
+            $dll = Get-Item "$env:VST3_PATH" -ErrorAction SilentlyContinue
+          }
+          if (-not $dll) { Write-Error "Could not locate .vst3 DLL to sign"; exit 1 }
+          Write-Host "Signing: $($dll.FullName)"
+          trusted-signing-cli `
+            -e $env:AZURE_SIGNING_ENDPOINT `
+            -a $env:AZURE_SIGNING_ACCOUNT `
+            -c $env:AZURE_SIGNING_PROFILE `
+            "$($dll.FullName)"
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+
+      - name: Create NSIS installer script
+        shell: pwsh
+        run: |
+          $version = $env:VERSION
+          $vst3Path = $env:VST3_PATH
+          $nsiContent = @"
+          !define PRODUCT_NAME "The Mofo's Mojo v1"
+          !define PRODUCT_VERSION "$version"
+          !define INSTALL_DIR "`$PROGRAMFILES64\Common Files\VST3\Altered Brain Chemistry"
+          !define VST3_FILENAME "The Mofo's Mojo v1.vst3"
+
+          Name "`${PRODUCT_NAME} `${PRODUCT_VERSION}"
+          OutFile "MofoMojo-$version-windows-installer.exe"
+          InstallDir "`${INSTALL_DIR}"
+          RequestExecutionLevel admin
+          Unicode True
+
+          Section "VST3 Plugin"
+            SetOutPath "`${INSTALL_DIR}"
+            ; Copy either the bundle directory or single file
+            File /r "$vst3Path"
+            ; Rename whatever was copied to the expected name
+            Rename "`${INSTALL_DIR}\*.vst3" "`${INSTALL_DIR}\`${VST3_FILENAME}"
+          SectionEnd
+          "@
+          $nsiContent | Out-File -FilePath installer.nsi -Encoding UTF8
+          Write-Host "NSIS script written"
+
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          makensis installer.nsi
+          $installer = Get-Item "MofoMojo-$env:VERSION-windows-installer.exe"
+          echo "INSTALLER_PATH=$($installer.FullName)" >> $env:GITHUB_ENV
+          echo "INSTALLER_NAME=$($installer.Name)" >> $env:GITHUB_ENV
+
+      - name: Sign installer (Windows — Azure Trusted Signing)
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
+        run: |
+          trusted-signing-cli `
+            -e $env:AZURE_SIGNING_ENDPOINT `
+            -a $env:AZURE_SIGNING_ACCOUNT `
+            -c $env:AZURE_SIGNING_PROFILE `
+            "$env:INSTALLER_PATH"
+
+      - name: Compute SHA-256
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash "$env:INSTALLER_PATH" -Algorithm SHA256).Hash.ToLower()
+          echo "FILE_SHA256=$hash" >> $env:GITHUB_ENV
+
+      - name: Upload signed installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: ${{ env.INSTALLER_PATH }}
+          retention-days: 7
+
+      - name: Save build metadata
+        shell: bash
+        run: |
+          cat > windows-meta.env << EOF
+          INSTALLER_NAME=$INSTALLER_NAME
+          FILE_SHA256=$FILE_SHA256
+          VERSION=$VERSION
+          SLUG=$SLUG
+          EOF
+
+      - name: Upload build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-meta
+          path: windows-meta.env
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 4: Upload Windows installer to S3 via release API
+# Re-run this job alone if the upload fails — no rebuild needed.
+# ─────────────────────────────────────────────────────────────────────────────
+  upload-windows:
+    needs: build-windows
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          role-session-name: mofo-release-windows-${{ github.run_id }}
+
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: installer/
+
+      - name: Download build metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-meta
+          path: .
+
+      - name: Load build metadata
+        run: sed 's/^ *//' windows-meta.env >> "$GITHUB_ENV"
+
+      - name: Resolve installer path
+        run: |
+          FILE=$(find installer/ -maxdepth 1 -type f | head -n 1)
+          echo "FILE_PATH=$FILE" >> "$GITHUB_ENV"
+
+      - name: Install botocore
+        run: pip3 install botocore --break-system-packages --quiet
+
+      - name: Upload installer to S3 and notify release API
+        env:
+          PLATFORM: windows
+          CONTENT_TYPE: application/octet-stream
+        run: |
+          if [ -z "$RELEASE_API" ]; then
+            echo "Missing RELEASE_API_URL secret." >&2
+            exit 1
+          fi
+          python3 << 'PYEOF'
+          import json, mimetypes, os, urllib.error, urllib.request
+          from urllib.parse import urlsplit
+          import botocore.auth, botocore.awsrequest, botocore.credentials, botocore.session
+
+          api_base   = os.environ["RELEASE_API"].rstrip("/")
+          slug       = os.environ["SLUG"]
+          version    = os.environ["VERSION"]
+          platform   = os.environ["PLATFORM"]
+          filename   = os.environ["INSTALLER_NAME"]
+          filepath   = os.environ["FILE_PATH"]
+          content_type = os.environ.get("CONTENT_TYPE") or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+          sha256     = os.environ["FILE_SHA256"]
+          aws_region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
+
+          session      = botocore.session.get_session()
+          creds        = session.get_credentials()
+          if creds is None:
+              raise RuntimeError("No AWS credentials available.")
+          frozen_creds = creds.get_frozen_credentials()
+
+          def signed_post_json(path, payload):
+              url  = f"{api_base}/{path.lstrip('/')}"
+              body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+              headers = {"Content-Type": "application/json", "Accept": "application/json", "Host": urlsplit(url).netloc}
+              aws_req = botocore.awsrequest.AWSRequest(method="POST", url=url, data=body, headers=headers)
+              botocore.auth.SigV4Auth(frozen_creds, "execute-api", aws_region).add_auth(aws_req)
+              req = urllib.request.Request(url, data=body, method="POST", headers=dict(aws_req.headers.items()))
+              try:
+                  with urllib.request.urlopen(req, timeout=120) as r:
+                      return json.loads(r.read().decode("utf-8"))
+              except urllib.error.HTTPError as exc:
+                  raise RuntimeError(f"{path} HTTP {exc.code}: {exc.read().decode('utf-8', errors='replace')[:2000]}") from exc
+
+          def put_file(upload_url):
+              size = os.path.getsize(filepath)
+              with open(filepath, "rb") as f:
+                  req = urllib.request.Request(upload_url, data=f, method="PUT",
+                      headers={"Content-Type": content_type, "Content-Length": str(size)})
+                  try:
+                      with urllib.request.urlopen(req, timeout=1800) as r: r.read()
+                  except urllib.error.HTTPError as exc:
+                      raise RuntimeError(f"S3 PUT HTTP {exc.code}: {exc.read().decode('utf-8', errors='replace')[:2000]}") from exc
+              return size
+
+          presign = signed_post_json("api/release-upload/presign", {
+              "slug": slug, "version": version, "platform": platform,
+              "filename": filename, "contentType": content_type,
+          })
+          print("Presign:", json.dumps({"key": presign.get("key"), "publicUrl": presign.get("publicUrl")}, indent=2))
+          missing = [k for k in ("uploadUrl", "key", "publicUrl") if k not in presign]
+          if missing: raise RuntimeError(f"Presign missing: {missing}")
+
+          size = put_file(presign["uploadUrl"])
+          print(f"S3 upload complete: {size} bytes")
+
+          confirm = signed_post_json("api/release-upload/confirm", {
+              "slug": slug, "version": version, "platform": platform,
+              "new_key": presign["key"], "new_url": presign["publicUrl"], "sha256": sha256,
+          })
+          print("Confirm:", json.dumps(confirm, indent=2))
+          PYEOF
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 5: Build, sign, and package for macOS (universal — VST3 + AU)
+# ─────────────────────────────────────────────────────────────────────────────
+  build-macos:
+    needs: build-rust-macos
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from .jucer file
+        run: |
+          VERSION=$(python3 -c "
+          import re, sys
+          with open('mofoMojoVst/Mofo Filter.jucer') as f:
+              content = f.read()
+          m = re.search(r'version=\"([^\"]+)\"', content)
+          if not m:
+              sys.exit('Could not find version in .jucer file')
+          print(m.group(1))
+          ")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Detected version: $VERSION"
+
+      - name: Download Rust macOS library
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-lib-macos
+          path: rust-lib-macos/
+
+      - name: Install CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Configure CMake (macOS universal)
+        run: |
+          cmake -S mofoMojoVst -B build-macos \
+            -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" \
+            -DRUST_LIBRARY_PATH="$(pwd)/rust-lib-macos/libsoftwarelicensor.a"
+
+      - name: Build VST3 + AU (macOS)
+        run: |
+          cmake --build build-macos --config Release \
+            --target ViatorJuceCMake_VST3 ViatorJuceCMake_AU
+
+          # Locate built bundles
+          VST3=$(find build-macos -name "*.vst3" -type d | head -n 1)
+          AU=$(find build-macos -name "*.component" -type d | head -n 1)
+          [ -z "$VST3" ] && { echo "VST3 bundle not found"; exit 1; }
+          [ -z "$AU"   ] && { echo "AU bundle not found"; exit 1; }
+          echo "VST3_PATH=$VST3" >> "$GITHUB_ENV"
+          echo "AU_PATH=$AU"     >> "$GITHUB_ENV"
+          echo "VST3: $VST3"
+          echo "AU:   $AU"
+
+      - name: Import signing certificates
+        env:
+          APPLE_APPLICATION_CERTIFICATE: ${{ secrets.APPLE_APPLICATION_CERTIFICATE }}
+          APPLE_APPLICATION_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
+          APPLE_INSTALLER_CERTIFICATE: ${{ secrets.APPLE_INSTALLER_CERTIFICATE }}
+          APPLE_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+          security create-keychain -p "" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "" "$KEYCHAIN_PATH"
+
+          # Import Developer ID Application cert (for codesign)
+          echo "$APPLE_APPLICATION_CERTIFICATE" | base64 --decode > /tmp/app-cert.p12
+          security import /tmp/app-cert.p12 -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_APPLICATION_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+
+          # Import Developer ID Installer cert (for productbuild)
+          echo "$APPLE_INSTALLER_CERTIFICATE" | base64 --decode > /tmp/installer-cert.p12
+          security import /tmp/installer-cert.p12 -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_INSTALLER_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/productbuild
+
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN_PATH"
+
+          rm /tmp/app-cert.p12 /tmp/installer-cert.p12
+          
+      - name: Sign VST3 bundle (macOS)
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" \
+            --options runtime \
+            --entitlements mofoMojoVst/entitlements.plist \
+            "$VST3_PATH"
+          codesign --verify --deep --strict "$VST3_PATH"
+          echo "VST3 signed OK"
+
+      - name: Sign AU bundle (macOS)
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" \
+            --options runtime \
+            --entitlements mofoMojoVst/entitlements.plist \
+            "$AU_PATH"
+          codesign --verify --deep --strict "$AU_PATH"
+          echo "AU signed OK"
+
+      - name: Stage plugin bundles for packaging
+        run: |
+          mkdir -p pkg-stage/vst3 pkg-stage/au
+          cp -r "$VST3_PATH" pkg-stage/vst3/
+          cp -r "$AU_PATH"   pkg-stage/au/
+
+      - name: Build flat macOS installer (.pkg)
+        env:
+          APPLE_INSTALLER_IDENTITY: ${{ secrets.APPLE_INSTALLER_IDENTITY }}
+        run: |
+          VERSION="$VERSION"
+          PKG_NAME="MofoMojo-${VERSION}-macos.pkg"
+
+          # Component packages (unsigned at component level; root pkg is signed)
+          pkgbuild \
+            --root pkg-stage/vst3 \
+            --install-location "/Library/Audio/Plug-Ins/VST3" \
+            --identifier "com.alteredbrainchemistry.mofomojo.vst3" \
+            --version "$VERSION" \
+            vst3-component.pkg
+
+          pkgbuild \
+            --root pkg-stage/au \
+            --install-location "/Library/Audio/Plug-Ins/Components" \
+            --identifier "com.alteredbrainchemistry.mofomojo.au" \
+            --version "$VERSION" \
+            au-component.pkg
+
+          # Synthesise a distribution XML
+          cat > distribution.xml << DISTXML
+          <?xml version="1.0" encoding="utf-8"?>
+          <installer-gui-script minSpecVersion="2">
+              <title>The Mofo's Mojo v1 ${VERSION}</title>
+              <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+              <choices-outline>
+                  <line choice="vst3"/>
+                  <line choice="au"/>
+              </choices-outline>
+              <choice id="vst3" title="VST3 Plugin">
+                  <pkg-ref id="com.alteredbrainchemistry.mofomojo.vst3"/>
+              </choice>
+              <choice id="au" title="AU Plugin">
+                  <pkg-ref id="com.alteredbrainchemistry.mofomojo.au"/>
+              </choice>
+              <pkg-ref id="com.alteredbrainchemistry.mofomojo.vst3">vst3-component.pkg</pkg-ref>
+              <pkg-ref id="com.alteredbrainchemistry.mofomojo.au">au-component.pkg</pkg-ref>
+          </installer-gui-script>
+          DISTXML
+
+          # Produce the flat distribution package
+          productbuild \
+            --distribution distribution.xml \
+            --package-path . \
+            --sign "$APPLE_INSTALLER_IDENTITY" \
+            "$PKG_NAME"
+
+          echo "PKG_PATH=$(pwd)/$PKG_NAME"   >> "$GITHUB_ENV"
+          echo "PKG_NAME=$PKG_NAME"          >> "$GITHUB_ENV"
+          echo "Flat pkg built: $PKG_NAME"
+
+      - name: Notarize macOS installer
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool submit "$PKG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_NOTARY_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$PKG_PATH"
+          echo "Notarization complete"
+
+      - name: Compute SHA-256
+        run: |
+          echo "FILE_SHA256=$(shasum -a 256 "$PKG_PATH" | awk '{print $1}')" >> "$GITHUB_ENV"
+
+      - name: Upload signed pkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-pkg
+          path: ${{ env.PKG_PATH }}
+          retention-days: 7
+
+      - name: Save build metadata
+        run: |
+          cat > macos-meta.env << EOF
+          PKG_NAME=$PKG_NAME
+          FILE_SHA256=$FILE_SHA256
+          VERSION=$VERSION
+          SLUG=$SLUG
+          EOF
+
+      - name: Upload build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-meta
+          path: macos-meta.env
+          retention-days: 7
+
+      - name: Cleanup keychain
+        if: always()
+        run: security delete-keychain "$KEYCHAIN_PATH" || true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 6: Upload macOS installer to S3 via release API
+# ─────────────────────────────────────────────────────────────────────────────
+  upload-macos:
+    needs: build-macos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          role-session-name: mofo-release-macos-${{ github.run_id }}
+
+      - name: Download pkg artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-pkg
+          path: pkg/
+
+      - name: Download build metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-meta
+          path: .
+
+      - name: Load build metadata
+        run: sed 's/^ *//' macos-meta.env >> "$GITHUB_ENV"
+
+      - name: Resolve pkg path
+        run: |
+          FILE=$(find pkg/ -maxdepth 1 -type f | head -n 1)
+          echo "FILE_PATH=$FILE" >> "$GITHUB_ENV"
+
+      - name: Install botocore
+        run: pip3 install botocore --break-system-packages --quiet
+
+      - name: Upload pkg to S3 and notify release API
+        env:
+          PLATFORM: macos
+          CONTENT_TYPE: application/x-newton-compatible-pkg
+        run: |
+          if [ -z "$RELEASE_API" ]; then
+            echo "Missing RELEASE_API_URL secret." >&2
+            exit 1
+          fi
+          python3 << 'PYEOF'
+          import json, mimetypes, os, urllib.error, urllib.request
+          from urllib.parse import urlsplit
+          import botocore.auth, botocore.awsrequest, botocore.credentials, botocore.session
+
+          api_base     = os.environ["RELEASE_API"].rstrip("/")
+          slug         = os.environ["SLUG"]
+          version      = os.environ["VERSION"]
+          platform     = os.environ["PLATFORM"]
+          filename     = os.environ["PKG_NAME"]
+          filepath     = os.environ["FILE_PATH"]
+          content_type = os.environ.get("CONTENT_TYPE") or "application/octet-stream"
+          sha256       = os.environ["FILE_SHA256"]
+          aws_region   = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
+
+          session      = botocore.session.get_session()
+          creds        = session.get_credentials()
+          if creds is None: raise RuntimeError("No AWS credentials available.")
+          frozen_creds = creds.get_frozen_credentials()
+
+          def signed_post_json(path, payload):
+              url  = f"{api_base}/{path.lstrip('/')}"
+              body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+              headers = {"Content-Type": "application/json", "Accept": "application/json", "Host": urlsplit(url).netloc}
+              aws_req = botocore.awsrequest.AWSRequest(method="POST", url=url, data=body, headers=headers)
+              botocore.auth.SigV4Auth(frozen_creds, "execute-api", aws_region).add_auth(aws_req)
+              req = urllib.request.Request(url, data=body, method="POST", headers=dict(aws_req.headers.items()))
+              try:
+                  with urllib.request.urlopen(req, timeout=120) as r:
+                      return json.loads(r.read().decode("utf-8"))
+              except urllib.error.HTTPError as exc:
+                  raise RuntimeError(f"{path} HTTP {exc.code}: {exc.read().decode('utf-8', errors='replace')[:2000]}") from exc
+
+          def put_file(upload_url):
+              size = os.path.getsize(filepath)
+              with open(filepath, "rb") as f:
+                  req = urllib.request.Request(upload_url, data=f, method="PUT",
+                      headers={"Content-Type": content_type, "Content-Length": str(size)})
+                  try:
+                      with urllib.request.urlopen(req, timeout=1800) as r: r.read()
+                  except urllib.error.HTTPError as exc:
+                      raise RuntimeError(f"S3 PUT HTTP {exc.code}: {exc.read().decode('utf-8', errors='replace')[:2000]}") from exc
+              return size
+
+          presign = signed_post_json("api/release-upload/presign", {
+              "slug": slug, "version": version, "platform": platform,
+              "filename": filename, "contentType": content_type,
+          })
+          print("Presign:", json.dumps({"key": presign.get("key"), "publicUrl": presign.get("publicUrl")}, indent=2))
+          missing = [k for k in ("uploadUrl", "key", "publicUrl") if k not in presign]
+          if missing: raise RuntimeError(f"Presign missing: {missing}")
+
+          size = put_file(presign["uploadUrl"])
+          print(f"S3 upload complete: {size} bytes")
+
+          confirm = signed_post_json("api/release-upload/confirm", {
+              "slug": slug, "version": version, "platform": platform,
+              "new_key": presign["key"], "new_url": presign["publicUrl"], "sha256": sha256,
+          })
+          print("Confirm:", json.dumps(confirm, indent=2))
+          PYEOF
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 7: Trigger site rebuild after both platforms upload successfully
+# ─────────────────────────────────────────────────────────────────────────────
+  rebuild-site:
+    needs: [upload-windows, upload-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          role-session-name: mofo-release-rebuild-${{ github.run_id }}
+
+      - name: Trigger Amplify rebuild via webhook
+        run: |
+          REBUILD_URL=$(aws ssm get-parameter \
+            --name "/abc-dev/rebuild-url" \
+            --with-decryption \
+            --query "Parameter.Value" \
+            --output text)
+          curl -sf -X POST "$REBUILD_URL"
+          echo "Amplify rebuild triggered"
