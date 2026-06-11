@@ -42,7 +42,7 @@ jobs:
       - name: Clone software-licensor-client-side-library
         run: |
           git clone https://github.com/nstilt1/software-licensor-client-side-library \
-            ../software-licensor-client-side-library
+            software-licensor-client-side-library
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -55,12 +55,12 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ../software-licensor-client-side-library/software_licensor_static_rust_lib/target
-          key: rust-macos-${{ hashFiles('../software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
+            software-licensor-client-side-library/software_licensor_static_rust_lib/target
+          key: rust-macos-${{ hashFiles('software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
           restore-keys: rust-macos-
 
       - name: Build universal Rust static library (macOS)
-        working-directory: ../software-licensor-client-side-library/software_licensor_static_rust_lib
+        working-directory: software-licensor-client-side-library/software_licensor_static_rust_lib
         run: |
           rustup target add aarch64-apple-darwin
           rustup target add x86_64-apple-darwin
@@ -80,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-macos
-          path: ../software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal/libsoftwarelicensor.a
+          path: software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal/libsoftwarelicensor.a
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ jobs:
         shell: bash
         run: |
           git clone https://github.com/nstilt1/software-licensor-client-side-library \
-            ../software-licensor-client-side-library
+            software-licensor-client-side-library
 
       - name: Install Rust stable (Windows MSVC)
         uses: dtolnay/rust-toolchain@stable
@@ -109,12 +109,12 @@ jobs:
           path: |
             ~\.cargo\registry
             ~\.cargo\git
-            ..\software-licensor-client-side-library\software_licensor_static_rust_lib\target
-          key: rust-windows-${{ hashFiles('../software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
+            software-licensor-client-side-library\software_licensor_static_rust_lib\target
+          key: rust-windows-${{ hashFiles('software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
           restore-keys: rust-windows-
 
       - name: Build Rust static library (Windows)
-        working-directory: ..\software-licensor-client-side-library\software_licensor_static_rust_lib
+        working-directory: software-licensor-client-side-library\software_licensor_static_rust_lib
         shell: pwsh
         run: |
           cargo build --release --features logging --target x86_64-pc-windows-msvc
@@ -125,7 +125,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-windows
-          path: ..\software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+          path: software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -542,7 +542,6 @@ jobs:
         env:
           APPLE_INSTALLER_IDENTITY: ${{ secrets.APPLE_INSTALLER_IDENTITY }}
         run: |
-          VERSION="$VERSION"
           PKG_NAME="MofoMojo-${VERSION}-macos.pkg"
 
           # Component packages (unsigned at component level; root pkg is signed)

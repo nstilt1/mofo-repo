@@ -26,7 +26,7 @@ namespace VersionCheck
     static constexpr int64    kCheckIntervalS = 3LL * 24LL * 3600LL;
     /** CloudFront URL that serves the current version string, e.g. "1.0.9". */
     static const juce::String kVersionUrl     =
-        "https://hephaestus.alteredbrainchemistry.com/downloads/mofo-mojo-version.txt";
+        "https://hephaestus.alteredbrainchemistry.com/downloads/the-mofos-mojo-version.txt";
     /** User-Agent header required by CloudFront to allow the download. */
     static const juce::String kUserAgent      = "MofoMojoPlugin/" VERSION;
 
