@@ -32,7 +32,7 @@ MagicKnob::MagicKnob(juce::String tooltip, juce::String paramID_)
 	};
 	setLookAndFeel(&knob);
 	setVelocityBasedMode(true);
-	setVelocityModeParameters(0.5, 1, 0.09, false);
+	setVelocityModeParameters(0.314159, 1, 0.09, false);
 	setRotaryParameters(juce::MathConstants<float>::pi * 1.25f,
 						juce::MathConstants<float>::pi * 2.75f,
 						true);
@@ -54,7 +54,6 @@ void MagicKnob::mouseDrag(const juce::MouseEvent& event)
 	else
 		setVelocityModeParameters(0.89, 1, 0.1, false);
 }
-//
 bool MagicKnob::keyPressed(const juce::KeyPress& k)
 {
 	char numChars[] = "-.0123456789";
@@ -72,7 +71,6 @@ bool MagicKnob::keyPressed(const juce::KeyPress& k)
 
 	return false;
 }
-//
 
 void MagicKnob::mouseDown(const juce::MouseEvent& event)
 {
