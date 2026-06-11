@@ -25,12 +25,10 @@ env:
   RELEASE_API: ${{ secrets.RELEASE_API_URL }}
   AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
   AWS_REGION: us-east-1
-  # Path to the .jucer file, relative to the repo root
   JUCER_FILE: mofoMojoVst/Mofo Filter.jucer
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 1: Build the Rust static library for macOS (universal)
-# Re-run this job alone if the Rust build breaks; later jobs depend on its artifact.
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
   build-rust-macos:
@@ -55,7 +53,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            software-licensor-client-side-library/software_licensor_static_rust_lib/target
+            software-licensor-client-side-library/target
           key: rust-macos-${{ hashFiles('software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
           restore-keys: rust-macos-
 
@@ -68,19 +66,19 @@ jobs:
           cargo build --release --features logging --target aarch64-apple-darwin
           cargo build --release --features logging --target x86_64-apple-darwin
 
-          mkdir -p target/universal
-          lipo -create -o target/universal/libsoftwarelicensor.a \
-            target/aarch64-apple-darwin/release/libsoftwarelicensor.a \
-            target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+          mkdir -p ../target/universal
+          lipo -create -o ../target/universal/libsoftwarelicensor.a \
+            ../target/aarch64-apple-darwin/release/libsoftwarelicensor.a \
+            ../target/x86_64-apple-darwin/release/libsoftwarelicensor.a
 
           echo "Universal library built:"
-          lipo -info target/universal/libsoftwarelicensor.a
+          lipo -info ../target/universal/libsoftwarelicensor.a
 
       - name: Upload Rust macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-macos
-          path: software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal/libsoftwarelicensor.a
+          path: software-licensor-client-side-library/target/universal/libsoftwarelicensor.a
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +107,7 @@ jobs:
           path: |
             ~\.cargo\registry
             ~\.cargo\git
-            software-licensor-client-side-library\software_licensor_static_rust_lib\target
+            software-licensor-client-side-library\target
           key: rust-windows-${{ hashFiles('software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
           restore-keys: rust-windows-
 
@@ -119,13 +117,13 @@ jobs:
         run: |
           cargo build --release --features logging --target x86_64-pc-windows-msvc
           Write-Host "Windows Rust library built:"
-          Get-Item target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+          Get-Item ..\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
 
       - name: Upload Rust Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-windows
-          path: software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+          path: software-licensor-client-side-library\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -180,10 +178,8 @@ jobs:
         shell: pwsh
         run: |
           cmake --build build-windows --config Release --target ViatorJuceCMake_VST3
-          # Find the built VST3
           $vst3 = Get-ChildItem -Recurse build-windows -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $vst3) {
-            # JUCE sometimes outputs a directory bundle on Windows
             $vst3 = Get-ChildItem -Recurse build-windows -Directory -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
           }
           if (-not $vst3) { Write-Error "VST3 bundle not found after build"; exit 1 }
@@ -193,8 +189,6 @@ jobs:
       - name: Install trusted-signing-cli
         shell: pwsh
         run: |
-          # Cache key already handles install caching via actions/cache above;
-          # here we just ensure it's present.
           cargo install trusted-signing-cli --version 0.9.0 --quiet 2>$null || true
           $cargoBin = "$env:USERPROFILE\.cargo\bin"
           echo "$cargoBin" >> $env:GITHUB_PATH
@@ -209,10 +203,8 @@ jobs:
           AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
           AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
         run: |
-          # Sign the inner DLL inside the VST3 bundle
           $dll = Get-ChildItem -Recurse "$env:VST3_PATH" -Filter "*.vst3" -File | Select-Object -First 1
           if (-not $dll) {
-            # Some JUCE builds output a flat .vst3 DLL rather than a bundle
             $dll = Get-Item "$env:VST3_PATH" -ErrorAction SilentlyContinue
           }
           if (-not $dll) { Write-Error "Could not locate .vst3 DLL to sign"; exit 1 }
@@ -248,9 +240,7 @@ jobs:
 
           Section "VST3 Plugin"
             SetOutPath "`${INSTALL_DIR}"
-            ; Copy either the bundle directory or single file
             File /r "$vst3Path"
-            ; Rename whatever was copied to the expected name
             Rename "`${INSTALL_DIR}\*.vst3" "`${INSTALL_DIR}\`${VST3_FILENAME}"
           SectionEnd
           "@
@@ -364,15 +354,15 @@ jobs:
           from urllib.parse import urlsplit
           import botocore.auth, botocore.awsrequest, botocore.credentials, botocore.session
 
-          api_base   = os.environ["RELEASE_API"].rstrip("/")
-          slug       = os.environ["SLUG"]
-          version    = os.environ["VERSION"]
-          platform   = os.environ["PLATFORM"]
-          filename   = os.environ["INSTALLER_NAME"]
-          filepath   = os.environ["FILE_PATH"]
+          api_base     = os.environ["RELEASE_API"].rstrip("/")
+          slug         = os.environ["SLUG"]
+          version      = os.environ["VERSION"]
+          platform     = os.environ["PLATFORM"]
+          filename     = os.environ["INSTALLER_NAME"]
+          filepath     = os.environ["FILE_PATH"]
           content_type = os.environ.get("CONTENT_TYPE") or mimetypes.guess_type(filename)[0] or "application/octet-stream"
-          sha256     = os.environ["FILE_SHA256"]
-          aws_region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
+          sha256       = os.environ["FILE_SHA256"]
+          aws_region   = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
 
           session      = botocore.session.get_session()
           creds        = session.get_credentials()
@@ -469,7 +459,6 @@ jobs:
           cmake --build build-macos --config Release \
             --target ViatorJuceCMake_VST3 ViatorJuceCMake_AU
 
-          # Locate built bundles
           VST3=$(find build-macos -name "*.vst3" -type d | head -n 1)
           AU=$(find build-macos -name "*.component" -type d | head -n 1)
           [ -z "$VST3" ] && { echo "VST3 bundle not found"; exit 1; }
@@ -493,13 +482,11 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "" "$KEYCHAIN_PATH"
 
-          # Import Developer ID Application cert (for codesign)
           echo "$APPLE_APPLICATION_CERTIFICATE" | base64 --decode > /tmp/app-cert.p12
           security import /tmp/app-cert.p12 -k "$KEYCHAIN_PATH" \
             -P "$APPLE_APPLICATION_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign
 
-          # Import Developer ID Installer cert (for productbuild)
           echo "$APPLE_INSTALLER_CERTIFICATE" | base64 --decode > /tmp/installer-cert.p12
           security import /tmp/installer-cert.p12 -k "$KEYCHAIN_PATH" \
             -P "$APPLE_INSTALLER_CERTIFICATE_PASSWORD" \
@@ -509,7 +496,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN_PATH"
 
           rm /tmp/app-cert.p12 /tmp/installer-cert.p12
-          
+
       - name: Sign VST3 bundle (macOS)
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -544,7 +531,6 @@ jobs:
         run: |
           PKG_NAME="MofoMojo-${VERSION}-macos.pkg"
 
-          # Component packages (unsigned at component level; root pkg is signed)
           pkgbuild \
             --root pkg-stage/vst3 \
             --install-location "/Library/Audio/Plug-Ins/VST3" \
@@ -559,7 +545,6 @@ jobs:
             --version "$VERSION" \
             au-component.pkg
 
-          # Synthesise a distribution XML
           cat > distribution.xml << DISTXML
           <?xml version="1.0" encoding="utf-8"?>
           <installer-gui-script minSpecVersion="2">
@@ -580,15 +565,14 @@ jobs:
           </installer-gui-script>
           DISTXML
 
-          # Produce the flat distribution package
           productbuild \
             --distribution distribution.xml \
             --package-path . \
             --sign "$APPLE_INSTALLER_IDENTITY" \
             "$PKG_NAME"
 
-          echo "PKG_PATH=$(pwd)/$PKG_NAME"   >> "$GITHUB_ENV"
-          echo "PKG_NAME=$PKG_NAME"          >> "$GITHUB_ENV"
+          echo "PKG_PATH=$(pwd)/$PKG_NAME" >> "$GITHUB_ENV"
+          echo "PKG_NAME=$PKG_NAME"        >> "$GITHUB_ENV"
           echo "Flat pkg built: $PKG_NAME"
 
       - name: Notarize macOS installer
