@@ -1,48 +1,45 @@
 cmake_minimum_required(VERSION 3.22.1)
 
 # ── Extract version from the .jucer file ──────────────────────────────────────
-# The .jucer XML has an attribute like: version="1.0.8"
-# We parse it here so the version is the single source of truth.
+# Supports both "X.Y.Z" and "X.Y" version strings in the jucer file.
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/Mofo Filter.jucer" JUCER_CONTENT)
-string(REGEX MATCH "version=\"([0-9]+\\.[0-9]+\\.[0-9]+)\"" _version_match "${JUCER_CONTENT}")
+string(REGEX MATCH "version=\"([0-9]+\\.[0-9]+(\\.[0-9]+)?)\"" _version_match "${JUCER_CONTENT}")
 if(NOT CMAKE_MATCH_1)
     message(FATAL_ERROR "Could not extract version from 'Mofo Filter.jucer'. "
-            "Make sure the file contains a version=\"X.Y.Z\" attribute.")
+            "Make sure the file contains a version=\"X.Y\" or \"X.Y.Z\" attribute.")
 endif()
 set(CURRENT_VERSION "${CMAKE_MATCH_1}")
 message(STATUS "Plugin version: ${CURRENT_VERSION}")
 
 project(ViatorJuceCMake VERSION ${CURRENT_VERSION})
 
+set(CMAKE_CXX_STANDARD 17)
+
 # ── Platform conditionals ──────────────────────────────────────────────────────
-if(NOT WIN32)
+# GTK and WebKit are Linux-only — do NOT check for them on macOS.
+if(UNIX AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
     include_directories(${GTK3_INCLUDE_DIRS})
     link_directories(${GTK3_LIBRARY_DIRS})
     add_definitions(${GTK3_CFLAGS_OTHER})
-endif()
 
-set(CMAKE_CXX_STANDARD 17)
-
-if(APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment target")
-    # Default to universal build; override on the command line if needed.
-    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
-endif()
-
-if(UNIX AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     pkg_check_modules(WEBKIT2 REQUIRED webkit2gtk-4.0)
     include_directories(${WEBKIT2_INCLUDE_DIRS})
     link_directories(${WEBKIT2_LIBRARY_DIRS})
     add_definitions(${WEBKIT2_CFLAGS_OTHER})
 endif()
 
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment target")
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
+endif()
+
 # ── General setup ──────────────────────────────────────────────────────────────
-set(PROJECT_NAME      "ViatorJuceCMake")
-set(PRODUCT_NAME      "The Mofo's Mojo v1")
-set(COMPANY_NAME      "Altered Brain Chemistry")
-set(BUNDLE_ID         "com.alteredbrainchemistry.MofoMojoFilter")
+set(PROJECT_NAME  "ViatorJuceCMake")
+set(PRODUCT_NAME  "The Mofo's Mojo v1")
+set(COMPANY_NAME  "Altered Brain Chemistry")
+set(BUNDLE_ID     "com.alteredbrainchemistry.MofoMojoFilter")
 
 if(APPLE)
     set(FORMATS Standalone AU VST3)
@@ -56,36 +53,29 @@ add_definitions(-w)
 add_subdirectory(modules/JUCE-7.0.7)
 
 # ── Rust static library ───────────────────────────────────────────────────────
-# RUST_LIBRARY_PATH may be passed in by the CI via -DRUST_LIBRARY_PATH=...
-# If not provided, fall back to sensible per-platform defaults (useful for
-# local developer builds where the library has already been compiled).
 if(DEFINED RUST_LIBRARY_PATH AND EXISTS "${RUST_LIBRARY_PATH}")
     set(RUST_LIBRARY "${RUST_LIBRARY_PATH}")
     message(STATUS "Using Rust library from: ${RUST_LIBRARY}")
 else()
-    # Fallback search paths for local builds
     if(WIN32)
         set(_rust_search_paths
-            "${CMAKE_SOURCE_DIR}/../../software-licensor-client-side-library/software_licensor_static_rust_lib/target/x86_64-pc-windows-msvc/release"
-            "${CMAKE_SOURCE_DIR}/../software-licensor-client-side-library/software_licensor_static_rust_lib/target/x86_64-pc-windows-msvc/release"
+            "${CMAKE_SOURCE_DIR}/../../software-licensor-client-side-library/target/x86_64-pc-windows-msvc/release"
+            "${CMAKE_SOURCE_DIR}/../software-licensor-client-side-library/target/x86_64-pc-windows-msvc/release"
         )
-        set(_rust_names softwarelicensor)
     elseif(APPLE)
         set(_rust_search_paths
-            "${CMAKE_SOURCE_DIR}/../../software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal"
-            "${CMAKE_SOURCE_DIR}/../software-licensor-client-side-library/software_licensor_static_rust_lib/target/universal"
+            "${CMAKE_SOURCE_DIR}/../../software-licensor-client-side-library/target/universal"
+            "${CMAKE_SOURCE_DIR}/../software-licensor-client-side-library/target/universal"
         )
-        set(_rust_names softwarelicensor)
     else()
         set(_rust_search_paths
-            "${CMAKE_SOURCE_DIR}/../../software-licensor-client-side-library/software_licensor_static_rust_lib/target/release"
-            "${CMAKE_SOURCE_DIR}/../software-licensor-client-side-library/software_licensor_static_rust_lib/target/release"
+            "${CMAKE_SOURCE_DIR}/../../software-licensor-client-side-library/target/release"
+            "${CMAKE_SOURCE_DIR}/../software-licensor-client-side-library/target/release"
         )
-        set(_rust_names softwarelicensor)
     endif()
 
     find_library(RUST_LIBRARY
-        NAMES ${_rust_names}
+        NAMES softwarelicensor
         PATHS ${_rust_search_paths}
         NO_DEFAULT_PATH
     )
@@ -135,7 +125,6 @@ target_compile_definitions(SharedCode INTERFACE
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
         CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
-        # VERSION is now derived from the .jucer file above
         VERSION="${CURRENT_VERSION}"
         JUCE_DISPLAY_SPLASH_SCREEN=0
         PRODUCT_NAME_WITHOUT_VERSION="TheMofosMojo"
@@ -148,17 +137,24 @@ file(GLOB_RECURSE SourceFiles CONFIGURE_DEPENDS
 )
 target_sources("${PROJECT_NAME}" PRIVATE ${SourceFiles})
 
-# ── Link libraries ────────────────────────────────────────────────────────────
-# Platform-specific system libraries needed by the Rust static lib
+# ── Platform-specific system libs required by the Rust static lib ─────────────
 set(PLATFORM_LIBS "")
 if(WIN32)
-    list(APPEND PLATFORM_LIBS Userenv Ntdll Bcrypt ws2_32 userenv)
+    # Must be listed as full cmake targets or with explicit flags on Windows;
+    # passing bare names works for most but ntdll needs the .lib suffix hint.
+    list(APPEND PLATFORM_LIBS
+        ws2_32.lib
+        userenv.lib
+        bcrypt.lib
+        ntdll.lib
+    )
 elseif(APPLE)
-    find_library(SECURITY_FW  Security)
-    find_library(COREFOUND_FW CoreFoundation)
+    find_library(SECURITY_FW  Security  REQUIRED)
+    find_library(COREFOUND_FW CoreFoundation REQUIRED)
     list(APPEND PLATFORM_LIBS "${SECURITY_FW}" "${COREFOUND_FW}")
 endif()
 
+# ── Link libraries ────────────────────────────────────────────────────────────
 target_link_libraries("${PROJECT_NAME}"
     PRIVATE
         juce::juce_audio_basics
