@@ -1,39 +1,13 @@
-cmake_minimum_required(VERSION 3.22.1)
+cmake_minimum_required(VERSION 3.23.1)
 
 # ── Extract version from the .jucer file ──────────────────────────────────────
-# Supports both "X.Y.Z" and "X.Y" version strings in the jucer file.
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/Mofo Filter.jucer" JUCER_CONTENT)
 string(REGEX MATCH "version=\"([0-9]+\\.[0-9]+(\\.[0-9]+)?)\"" _version_match "${JUCER_CONTENT}")
 if(NOT CMAKE_MATCH_1)
-    message(FATAL_ERROR "Could not extract version from 'Mofo Filter.jucer'. "
-            "Make sure the file contains a version=\"X.Y\" or \"X.Y.Z\" attribute.")
+    message(FATAL_ERROR "Could not extract version from 'Mofo Filter.jucer'.")
 endif()
 set(CURRENT_VERSION "${CMAKE_MATCH_1}")
 message(STATUS "Plugin version: ${CURRENT_VERSION}")
-
-project(ViatorJuceCMake VERSION ${CURRENT_VERSION})
-
-set(CMAKE_CXX_STANDARD 17)
-
-# ── Platform conditionals ──────────────────────────────────────────────────────
-# GTK and WebKit are Linux-only — do NOT check for them on macOS.
-if(UNIX AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
-    include_directories(${GTK3_INCLUDE_DIRS})
-    link_directories(${GTK3_LIBRARY_DIRS})
-    add_definitions(${GTK3_CFLAGS_OTHER})
-
-    pkg_check_modules(WEBKIT2 REQUIRED webkit2gtk-4.0)
-    include_directories(${WEBKIT2_INCLUDE_DIRS})
-    link_directories(${WEBKIT2_LIBRARY_DIRS})
-    add_definitions(${WEBKIT2_CFLAGS_OTHER})
-endif()
-
-if(APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment target")
-    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
-endif()
 
 # ── General setup ──────────────────────────────────────────────────────────────
 set(PROJECT_NAME  "ViatorJuceCMake")
@@ -41,16 +15,45 @@ set(PRODUCT_NAME  "The Mofo's Mojo v1")
 set(COMPANY_NAME  "Altered Brain Chemistry")
 set(BUNDLE_ID     "com.alteredbrainchemistry.MofoMojoFilter")
 
+project(ViatorJuceCMake VERSION ${CURRENT_VERSION})
+
+# ── JUCE 7.0.7 (pinned) ───────────────────────────────────────────────────────
+add_subdirectory(modules/JUCE-7.0.7)
+
+# ── Project configuration ─────────────────────────────────────────────────────
+set(CMAKE_CXX_STANDARD 17)
+
+# ── macOS settings ────────────────────────────────────────────────────────────
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment version" FORCE)
+    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Architectures" FORCE)
+    set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET[arch=arm64] "11.0" CACHE STRING "arm64 minimum deployment target" FORCE)
+endif()
+
+# ── Linux only: GTK / WebKit ──────────────────────────────────────────────────
+if(UNIX AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GTK3    REQUIRED gtk+-3.0)
+    pkg_check_modules(WEBKIT2 REQUIRED webkit2gtk-4.0)
+    include_directories(${GTK3_INCLUDE_DIRS}    ${WEBKIT2_INCLUDE_DIRS})
+    link_directories(${GTK3_LIBRARY_DIRS}       ${WEBKIT2_LIBRARY_DIRS})
+    add_definitions(${GTK3_CFLAGS_OTHER}        ${WEBKIT2_CFLAGS_OTHER})
+endif()
+
+# ── Disable warnings (matches reference project) ──────────────────────────────
+add_definitions(-w)
+
+# ── Windows MSVC runtime ──────────────────────────────────────────────────────
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE INTERNAL "")
+endif()
+
+# ── Formats ───────────────────────────────────────────────────────────────────
 if(APPLE)
     set(FORMATS AU VST3)
 else()
     set(FORMATS VST3)
 endif()
-
-add_definitions(-w)
-
-# ── JUCE 7.0.7 (pinned) ───────────────────────────────────────────────────────
-add_subdirectory(modules/JUCE-7.0.7)
 
 # ── Rust static library ───────────────────────────────────────────────────────
 if(DEFINED RUST_LIBRARY_PATH AND EXISTS "${RUST_LIBRARY_PATH}")
@@ -73,18 +76,15 @@ else()
             "${CMAKE_SOURCE_DIR}/../software-licensor-client-side-library/target/release"
         )
     endif()
-
     find_library(RUST_LIBRARY
         NAMES softwarelicensor
         PATHS ${_rust_search_paths}
         NO_DEFAULT_PATH
     )
-
     if(NOT RUST_LIBRARY)
         message(FATAL_ERROR
-            "Rust static library not found.\n"
-            "Pass -DRUST_LIBRARY_PATH=<absolute path to .a/.lib> to cmake,\n"
-            "or build the library first with 'cargo build --release --features logging'.")
+            "Rust static library not found. "
+            "Pass -DRUST_LIBRARY_PATH=<path> to cmake.")
     endif()
     message(STATUS "Found Rust library (fallback): ${RUST_LIBRARY}")
 endif()
@@ -104,28 +104,12 @@ juce_add_plugin("${PROJECT_NAME}"
         IS_SYNTH              FALSE
 )
 
-# Unity build on the plugin target only — NOT applied globally so juceaide
-# and other JUCE internal targets are unaffected.
-# JUCE's own module .cpp/.mm files carry an explicit #error guard against
-# being included in a unity bundle, so we exclude them from bundling while
-# keeping unity build active for your own source files.
-set_target_properties("${PROJECT_NAME}" PROPERTIES UNITY_BUILD ON)
+add_compile_definitions(JUCE_PROJECT_NAME="${PROJECT_NAME}")
 
-file(GLOB_RECURSE JuceModuleFiles
-    "${CMAKE_CURRENT_SOURCE_DIR}/modules/JUCE-7.0.7/modules/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/modules/JUCE-7.0.7/modules/*.mm"
-)
-set_source_files_properties(${JuceModuleFiles} PROPERTIES
-    SKIP_UNITY_BUILD_INCLUSION ON
-)
-
-juce_add_binary_data(Assets SOURCES
-        unlockedUI.png
-)
+# ── Binary assets ─────────────────────────────────────────────────────────────
+juce_add_binary_data(Assets SOURCES unlockedUI.png)
 
 juce_generate_juce_header("${PROJECT_NAME}")
-
-add_compile_definitions(JUCE_PROJECT_NAME="${PROJECT_NAME}")
 
 # ── SharedCode interface library ──────────────────────────────────────────────
 add_library(SharedCode INTERFACE)
@@ -152,24 +136,23 @@ file(GLOB_RECURSE SourceFiles CONFIGURE_DEPENDS
 )
 target_sources("${PROJECT_NAME}" PRIVATE ${SourceFiles})
 
-# ── Platform-specific system libs required by the Rust static lib ─────────────
+# ── Platform system libs for Rust ─────────────────────────────────────────────
 set(PLATFORM_LIBS "")
 if(WIN32)
-    list(APPEND PLATFORM_LIBS
-        ws2_32.lib
-        userenv.lib
-        bcrypt.lib
-        ntdll.lib
-    )
+    list(APPEND PLATFORM_LIBS ws2_32.lib userenv.lib bcrypt.lib ntdll.lib)
 elseif(APPLE)
-    find_library(SECURITY_FW  Security  REQUIRED)
+    find_library(SECURITY_FW  Security      REQUIRED)
     find_library(COREFOUND_FW CoreFoundation REQUIRED)
     list(APPEND PLATFORM_LIBS "${SECURITY_FW}" "${COREFOUND_FW}")
 endif()
 
 # ── Link libraries ────────────────────────────────────────────────────────────
+# NOTE: juce_recommended_lto_flags intentionally omitted — LTO causes
+# multi-hour linker hangs on CI runners with JUCE's codebase size.
 target_link_libraries("${PROJECT_NAME}"
     PRIVATE
+        SharedCode
+        Assets
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_formats
@@ -184,8 +167,6 @@ target_link_libraries("${PROJECT_NAME}"
         juce::juce_gui_basics
         juce::juce_gui_extra
         juce::juce_product_unlocking
-        SharedCode
-        Assets
         "${RUST_LIBRARY}"
         ${PLATFORM_LIBS}
     PUBLIC

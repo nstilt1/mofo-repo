@@ -25,10 +25,9 @@ env:
   RELEASE_API: ${{ secrets.RELEASE_API_URL }}
   AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
   AWS_REGION: us-east-1
-  JUCER_FILE: mofoMojoVst/Mofo Filter.jucer
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Job 1: Build the Rust static library for macOS (universal)
+# Job 1: Build Rust static library for macOS (universal)
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
   build-rust-macos:
@@ -84,7 +83,7 @@ jobs:
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Job 2: Build the Rust static library for Windows (x86_64-pc-windows-msvc)
+# Job 2: Build Rust static library for Windows
 # ─────────────────────────────────────────────────────────────────────────────
   build-rust-windows:
     runs-on: windows-latest
@@ -130,11 +129,12 @@ jobs:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 3: Build, sign, and package for Windows
+# Uses MSBuild (same as reference project) — avoids Ninja/sccache linker hangs
 # ─────────────────────────────────────────────────────────────────────────────
   build-windows:
     needs: build-rust-windows
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -158,58 +158,34 @@ jobs:
           name: rust-lib-windows
           path: rust-lib-windows/
 
-      - name: Install CMake and Ninja
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.1
+        with:
+          msbuild-architecture: x64
+
+      - name: Install CMake
         uses: lukka/get-cmake@latest
 
-      - name: Install MSVC build tools
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.5
-
-      - name: Cache sccache storage
-        uses: actions/cache@v4
-        with:
-          path: C:\sccache
-          key: sccache-windows-${{ github.ref }}-${{ github.sha }}
-          restore-keys: |
-            sccache-windows-${{ github.ref }}-
-            sccache-windows-
-
-      - name: Configure CMake (Windows)
+      - name: Configure CMake (Windows — Visual Studio generator)
         shell: pwsh
-        env:
-          SCCACHE_DIR: C:\sccache
-          SCCACHE_CACHE_SIZE: 10G
         run: |
           $rustLib = (Resolve-Path "rust-lib-windows\softwarelicensor.lib").Path
           cmake -S mofoMojoVst -B build-windows `
-            -G "Ninja" `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DRUST_LIBRARY_PATH="$rustLib" `
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache `
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+            -G "Visual Studio 17 2022" `
+            -A x64 `
+            -DRUST_LIBRARY_PATH="$rustLib"
 
       - name: Build VST3 (Windows)
         shell: pwsh
-        env:
-          SCCACHE_DIR: C:\sccache
-          SCCACHE_CACHE_SIZE: 10G
         run: |
           cmake --build build-windows --config Release --target ViatorJuceCMake_VST3
-          $vst3 = Get-ChildItem -Recurse build-windows -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $vst3 = Get-ChildItem -Recurse build-windows -Directory -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $vst3) {
-            $vst3 = Get-ChildItem -Recurse build-windows -Directory -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
+            $vst3 = Get-ChildItem -Recurse build-windows -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
           }
-          if (-not $vst3) { Write-Error "VST3 bundle not found after build"; exit 1 }
+          if (-not $vst3) { Write-Error "VST3 not found after build"; exit 1 }
           echo "VST3_PATH=$($vst3.FullName)" >> $env:GITHUB_ENV
           Write-Host "Built VST3 at: $($vst3.FullName)"
-
-      - name: sccache stats
-        shell: pwsh
-        run: sccache --show-stats
 
       - name: Install trusted-signing-cli
         shell: pwsh
@@ -228,9 +204,7 @@ jobs:
           AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
         run: |
           $dll = Get-ChildItem -Recurse "$env:VST3_PATH" -Filter "*.vst3" -File | Select-Object -First 1
-          if (-not $dll) {
-            $dll = Get-Item "$env:VST3_PATH" -ErrorAction SilentlyContinue
-          }
+          if (-not $dll) { $dll = Get-Item "$env:VST3_PATH" -ErrorAction SilentlyContinue }
           if (-not $dll) { Write-Error "Could not locate .vst3 DLL to sign"; exit 1 }
           Write-Host "Signing: $($dll.FullName)"
           trusted-signing-cli `
@@ -269,7 +243,6 @@ jobs:
           SectionEnd
           "@
           $nsiContent | Out-File -FilePath installer.nsi -Encoding UTF8
-          Write-Host "NSIS script written"
 
       - name: Build NSIS installer
         shell: pwsh
@@ -383,14 +356,13 @@ jobs:
           platform     = os.environ["PLATFORM"]
           filename     = os.environ["INSTALLER_NAME"]
           filepath     = os.environ["FILE_PATH"]
-          content_type = os.environ.get("CONTENT_TYPE") or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+          content_type = os.environ.get("CONTENT_TYPE") or "application/octet-stream"
           sha256       = os.environ["FILE_SHA256"]
           aws_region   = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
 
           session      = botocore.session.get_session()
           creds        = session.get_credentials()
-          if creds is None:
-              raise RuntimeError("No AWS credentials available.")
+          if creds is None: raise RuntimeError("No AWS credentials available.")
           frozen_creds = creds.get_frozen_credentials()
 
           def signed_post_json(path, payload):
@@ -424,10 +396,8 @@ jobs:
           print("Presign:", json.dumps({"key": presign.get("key"), "publicUrl": presign.get("publicUrl")}, indent=2))
           missing = [k for k in ("uploadUrl", "key", "publicUrl") if k not in presign]
           if missing: raise RuntimeError(f"Presign missing: {missing}")
-
           size = put_file(presign["uploadUrl"])
           print(f"S3 upload complete: {size} bytes")
-
           confirm = signed_post_json("api/release-upload/confirm", {
               "slug": slug, "version": version, "platform": platform,
               "new_key": presign["key"], "new_url": presign["publicUrl"], "sha256": sha256,
@@ -436,12 +406,13 @@ jobs:
           PYEOF
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Job 5: Build, sign, and package for macOS (universal — VST3 + AU)
+# Job 5: Build, sign, and package for macOS (universal x86_64 + arm64)
+# Uses default CMake generator (Xcode) same as reference project
 # ─────────────────────────────────────────────────────────────────────────────
   build-macos:
     needs: build-rust-macos
-    runs-on: macos-14   # Xcode 15.x + macOS 14 SDK — required for JUCE 7.0.7 (avoids CGWindowListCreateImage removal in macOS 15 SDK)
-    timeout-minutes: 30
+    runs-on: macos-14   # Xcode 15.x + macOS 14 SDK — required for JUCE 7.0.7
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -451,11 +422,9 @@ jobs:
           VERSION=$(python3 -c "
           import re, sys
           with open('mofoMojoVst/Mofo Filter.jucer') as f:
-              content = f.read()
-          m = re.search(r'version=\"([^\"]+)\"', content)
-          if not m:
-              sys.exit('Could not find version in .jucer file')
-          print(m.group(1))
+              m = re.search(r'version=\"([^\"]+)\"', f.read())
+              if not m: sys.exit('Version not found')
+              print(m.group(1))
           ")
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Detected version: $VERSION"
@@ -466,15 +435,14 @@ jobs:
           name: rust-lib-macos
           path: rust-lib-macos/
 
-      - name: Install CMake and Ninja
+      - name: Install CMake
         uses: lukka/get-cmake@latest
 
-      - name: Configure CMake (macOS universal)
+      - name: Configure CMake (macOS — default Xcode generator, universal binary)
         run: |
           cmake -S mofoMojoVst -B build-macos \
-            -G "Ninja" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" \
             -DRUST_LIBRARY_PATH="$(pwd)/rust-lib-macos/libsoftwarelicensor.a"
 
@@ -501,24 +469,17 @@ jobs:
         run: |
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
-
           security create-keychain -p "" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "" "$KEYCHAIN_PATH"
-
           echo "$APPLE_APPLICATION_CERTIFICATE" | base64 --decode > /tmp/app-cert.p12
           security import /tmp/app-cert.p12 -k "$KEYCHAIN_PATH" \
-            -P "$APPLE_APPLICATION_CERTIFICATE_PASSWORD" \
-            -T /usr/bin/codesign
-
+            -P "$APPLE_APPLICATION_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           echo "$APPLE_INSTALLER_CERTIFICATE" | base64 --decode > /tmp/installer-cert.p12
           security import /tmp/installer-cert.p12 -k "$KEYCHAIN_PATH" \
-            -P "$APPLE_INSTALLER_CERTIFICATE_PASSWORD" \
-            -T /usr/bin/productbuild
-
+            -P "$APPLE_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/productbuild
           security list-keychain -d user -s "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN_PATH"
-
           rm /tmp/app-cert.p12 /tmp/installer-cert.p12
 
       - name: Sign VST3 bundle (macOS)
@@ -597,7 +558,6 @@ jobs:
 
           echo "PKG_PATH=$(pwd)/$PKG_NAME" >> "$GITHUB_ENV"
           echo "PKG_NAME=$PKG_NAME"        >> "$GITHUB_ENV"
-          echo "Flat pkg built: $PKG_NAME"
 
       - name: Notarize macOS installer
         env:
@@ -742,10 +702,8 @@ jobs:
           print("Presign:", json.dumps({"key": presign.get("key"), "publicUrl": presign.get("publicUrl")}, indent=2))
           missing = [k for k in ("uploadUrl", "key", "publicUrl") if k not in presign]
           if missing: raise RuntimeError(f"Presign missing: {missing}")
-
           size = put_file(presign["uploadUrl"])
           print(f"S3 upload complete: {size} bytes")
-
           confirm = signed_post_json("api/release-upload/confirm", {
               "slug": slug, "version": version, "platform": platform,
               "new_key": presign["key"], "new_url": presign["publicUrl"], "sha256": sha256,
