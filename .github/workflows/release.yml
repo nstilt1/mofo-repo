@@ -59,6 +59,8 @@ jobs:
 
       - name: Build universal Rust static library (macOS)
         working-directory: software-licensor-client-side-library/software_licensor_static_rust_lib
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "10.13"
         run: |
           rustup target add aarch64-apple-darwin
           rustup target add x86_64-apple-darwin
@@ -132,6 +134,7 @@ jobs:
   build-windows:
     needs: build-rust-windows
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -438,6 +441,7 @@ jobs:
   build-macos:
     needs: build-rust-macos
     runs-on: macos-14   # Xcode 15.x + macOS 14 SDK — required for JUCE 7.0.7 (avoids CGWindowListCreateImage removal in macOS 15 SDK)
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
