@@ -437,7 +437,7 @@ jobs:
 # ─────────────────────────────────────────────────────────────────────────────
   build-macos:
     needs: build-rust-macos
-    runs-on: macos-13
+    runs-on: macos-14   # Xcode 15.x + macOS 14 SDK — required for JUCE 7.0.7 (avoids CGWindowListCreateImage removal in macOS 15 SDK)
 
     steps:
       - uses: actions/checkout@v4
