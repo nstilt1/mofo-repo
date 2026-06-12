@@ -42,9 +42,9 @@ set(COMPANY_NAME  "Altered Brain Chemistry")
 set(BUNDLE_ID     "com.alteredbrainchemistry.MofoMojoFilter")
 
 if(APPLE)
-    set(FORMATS Standalone AU VST3)
+    set(FORMATS AU VST3)
 else()
-    set(FORMATS Standalone VST3)
+    set(FORMATS VST3)
 endif()
 
 add_definitions(-w)
@@ -104,6 +104,10 @@ juce_add_plugin("${PROJECT_NAME}"
         IS_SYNTH              FALSE
 )
 
+# Unity build on the plugin target only — NOT applied globally so juceaide
+# and other JUCE internal targets are unaffected.
+set_target_properties("${PROJECT_NAME}" PROPERTIES UNITY_BUILD ON)
+
 juce_add_binary_data(Assets SOURCES
         unlockedUI.png
 )
@@ -140,8 +144,6 @@ target_sources("${PROJECT_NAME}" PRIVATE ${SourceFiles})
 # ── Platform-specific system libs required by the Rust static lib ─────────────
 set(PLATFORM_LIBS "")
 if(WIN32)
-    # Must be listed as full cmake targets or with explicit flags on Windows;
-    # passing bare names works for most but ntdll needs the .lib suffix hint.
     list(APPEND PLATFORM_LIBS
         ws2_32.lib
         userenv.lib

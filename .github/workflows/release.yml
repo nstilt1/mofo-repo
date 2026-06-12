@@ -142,11 +142,9 @@ jobs:
           VERSION=$(python3 -c "
           import re, sys
           with open('mofoMojoVst/Mofo Filter.jucer', encoding='utf-8') as f:
-              content = f.read()
-          m = re.search(r'version=\"([^\"]+)\"', content)
-          if not m:
-              sys.exit('Could not find version in .jucer file')
-          print(m.group(1))
+              m = re.search(r'version=\"([^\"]+)\"', f.read())
+              if not m: sys.exit('Version not found')
+              print(m.group(1))
           ")
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Detected version: $VERSION"
@@ -165,17 +163,37 @@ jobs:
         with:
           arch: x64
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.5
+
+      - name: Cache sccache storage
+        uses: actions/cache@v4
+        with:
+          path: C:\sccache
+          key: sccache-windows-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            sccache-windows-${{ github.ref }}-
+            sccache-windows-
+
       - name: Configure CMake (Windows)
         shell: pwsh
+        env:
+          SCCACHE_DIR: C:\sccache
+          SCCACHE_CACHE_SIZE: 10G
         run: |
           $rustLib = (Resolve-Path "rust-lib-windows\softwarelicensor.lib").Path
           cmake -S mofoMojoVst -B build-windows `
             -G "Ninja" `
             -DCMAKE_BUILD_TYPE=Release `
-            -DRUST_LIBRARY_PATH="$rustLib"
+            -DRUST_LIBRARY_PATH="$rustLib" `
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build VST3 (Windows)
         shell: pwsh
+        env:
+          SCCACHE_DIR: C:\sccache
+          SCCACHE_CACHE_SIZE: 10G
         run: |
           cmake --build build-windows --config Release --target ViatorJuceCMake_VST3
           $vst3 = Get-ChildItem -Recurse build-windows -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -186,12 +204,15 @@ jobs:
           echo "VST3_PATH=$($vst3.FullName)" >> $env:GITHUB_ENV
           Write-Host "Built VST3 at: $($vst3.FullName)"
 
+      - name: sccache stats
+        shell: pwsh
+        run: sccache --show-stats
+
       - name: Install trusted-signing-cli
         shell: pwsh
         run: |
           cargo install trusted-signing-cli --version 0.9.0 --quiet 2>$null || true
-          $cargoBin = "$env:USERPROFILE\.cargo\bin"
-          echo "$cargoBin" >> $env:GITHUB_PATH
+          echo "$env:USERPROFILE\.cargo\bin" >> $env:GITHUB_PATH
 
       - name: Sign VST3 (Windows — Azure Trusted Signing)
         shell: pwsh
@@ -303,7 +324,6 @@ jobs:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 4: Upload Windows installer to S3 via release API
-# Re-run this job alone if the upload fails — no rebuild needed.
 # ─────────────────────────────────────────────────────────────────────────────
   upload-windows:
     needs: build-windows
@@ -422,6 +442,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Select Xcode 15.4 (ships macOS 14.5 SDK — required for JUCE 7.0.7)
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
       - name: Extract version from .jucer file
         run: |
           VERSION=$(python3 -c "
@@ -452,7 +475,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" \
-            -DCMAKE_OSX_SYSROOT=$(xcrun --sdk macosx14.5 --show-sdk-path 2>/dev/null || xcrun --sdk macosx --show-sdk-path) \
             -DRUST_LIBRARY_PATH="$(pwd)/rust-lib-macos/libsoftwarelicensor.a"
 
       - name: Build VST3 + AU (macOS)
