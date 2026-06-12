@@ -5,7 +5,7 @@
 #include "PluginProcessor.h"
 #include "Knob.h"
 #include "MagicKnob.h"
-#include "../Source/modules/licensing/SoftwareLicensorUnlockForm.h";
+#include "../Source/modules/licensing/SoftwareLicensorUnlockForm.h"
 
 // ─── Version ─────────────────────────────────────────────────────────────────
 // SOURCE OF TRUTH: the version string is injected by CMake from the .jucer file
@@ -26,7 +26,7 @@ namespace VersionCheck
     static constexpr int64    kCheckIntervalS = 3LL * 24LL * 3600LL;
     /** CloudFront URL that serves the current version string, e.g. "1.0.9". */
     static const juce::String kVersionUrl     =
-        "https://hephaestus.alteredbrainchemistry.com/downloads/the-mofos-mojo-version.txt";
+        "https://hephaestus.alteredbrainchemistry.com/downloads/mofo-mojo-version.txt";
     /** User-Agent header required by CloudFront to allow the download. */
     static const juce::String kUserAgent      = "MofoMojoPlugin/" VERSION;
 
@@ -99,7 +99,7 @@ namespace VersionCheck
         // The file should contain a single line like "1.0.9"
         auto text = stream->readEntireStreamAsString().trim();
         // Basic sanity check: must look like a version number
-        if (text.isEmpty() || !text[0].isDigit()) return {};
+        if (text.isEmpty() || !juce::CharacterFunctions::isDigit (text[0])) return {};
         return text;
     }
 } // namespace VersionCheck
@@ -385,7 +385,6 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> driveTensionAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speedTensionAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixerAttachment;
-
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MofoFilterAudioProcessorEditor)
 };
