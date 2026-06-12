@@ -106,7 +106,18 @@ juce_add_plugin("${PROJECT_NAME}"
 
 # Unity build on the plugin target only — NOT applied globally so juceaide
 # and other JUCE internal targets are unaffected.
+# JUCE's own module .cpp/.mm files carry an explicit #error guard against
+# being included in a unity bundle, so we exclude them from bundling while
+# keeping unity build active for your own source files.
 set_target_properties("${PROJECT_NAME}" PROPERTIES UNITY_BUILD ON)
+
+file(GLOB_RECURSE JuceModuleFiles
+    "${CMAKE_CURRENT_SOURCE_DIR}/modules/JUCE-7.0.7/modules/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/modules/JUCE-7.0.7/modules/*.mm"
+)
+set_source_files_properties(${JuceModuleFiles} PROPERTIES
+    SKIP_UNITY_BUILD_INCLUSION ON
+)
 
 juce_add_binary_data(Assets SOURCES
         unlockedUI.png
