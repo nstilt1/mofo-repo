@@ -129,7 +129,9 @@ jobs:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 3: Build, sign, and package for Windows
-# Uses MSBuild (same as reference project) — avoids Ninja/sccache linker hangs
+# Uses Ninja + ilammy/msvc-dev-cmd (VS generator fails on GH runners because
+# setup-msbuild only adds MSBuild to PATH but does not register a VS instance,
+# so CMake's VS instance discovery via vswhere returns nothing).
 # ─────────────────────────────────────────────────────────────────────────────
   build-windows:
     needs: build-rust-windows
@@ -158,30 +160,29 @@ jobs:
           name: rust-lib-windows
           path: rust-lib-windows/
 
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v1.1
+      # Sets up the MSVC compiler environment (cl.exe, link.exe, include/lib
+      # paths) via vcvarsall.bat — required for Ninja + MSVC on GH runners.
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
         with:
-          msbuild-architecture: x64
+          arch: x64
 
-      - name: Install CMake
+      - name: Install CMake + Ninja
         uses: lukka/get-cmake@latest
 
-      - name: Configure CMake (Windows — Visual Studio generator)
+      - name: Configure CMake (Windows — Ninja + MSVC)
         shell: pwsh
         run: |
           $rustLib = (Resolve-Path "rust-lib-windows\softwarelicensor.lib").Path
           cmake -S mofoMojoVst -B build-windows `
-            -G "Visual Studio 17 2022" `
-            -A x64 `
-            -DRUST_LIBRARY_PATH="$rustLib" `
-            -DCMAKE_EXE_LINKER_FLAGS_RELEASE="/INCREMENTAL:NO" `
-            -DCMAKE_SHARED_LINKER_FLAGS_RELEASE="/INCREMENTAL:NO" `
-            -DCMAKE_MODULE_LINKER_FLAGS_RELEASE="/INCREMENTAL:NO"
+            -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DRUST_LIBRARY_PATH="$rustLib"
 
       - name: Build VST3 (Windows)
         shell: pwsh
         run: |
-          cmake --build build-windows --config Release --target ViatorJuceCMake_VST3
+          cmake --build build-windows --target ViatorJuceCMake_VST3
           $vst3 = Get-ChildItem -Recurse build-windows -Directory -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $vst3) {
             $vst3 = Get-ChildItem -Recurse build-windows -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -410,16 +411,17 @@ jobs:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 5: Build, sign, and package for macOS (universal x86_64 + arm64)
-# Uses default CMake generator (Xcode) same as reference project
+# Split-arch strategy with Ninja generator and thin Rust .a slices.
+# Key insight: passing the universal (fat) libsoftwarelicensor.a to a
+# single-arch ld on macOS 14 causes ld to hang indefinitely parsing Rust
+# panic/unwind metadata across both slices.  We lipo-thin the .a first so
+# each build sees only the slice it needs.  Ninja is used instead of the
+# default Xcode generator so the hang is not masked by Xcode process
+# supervision and parallel compilation is explicit.
 # ─────────────────────────────────────────────────────────────────────────────
   build-macos:
     needs: build-rust-macos
     runs-on: macos-14   # Xcode 15.x + macOS 14 SDK — required for JUCE 7.0.7
-    # Split-arch strategy: build arm64 and x86_64 separately then lipo-combine.
-    # Building CMAKE_OSX_ARCHITECTURES="x86_64;arm64" in one pass makes the
-    # linker do codegen for both slices simultaneously and hangs indefinitely
-    # even without LTO.  Two single-arch link steps + lipo is dramatically
-    # faster and produces an identical universal bundle.
     timeout-minutes: 90
 
     steps:
@@ -443,35 +445,49 @@ jobs:
           name: rust-lib-macos
           path: rust-lib-macos/
 
-      - name: Install CMake
+      - name: Install CMake + Ninja
         uses: lukka/get-cmake@latest
+
+      # Thin the universal .a into per-arch slices before passing to the linker.
+      # Feeding a fat .a to single-arch ld on macOS 14 causes it to hang
+      # parsing Rust unwind/panic metadata across both slices simultaneously.
+      - name: Thin Rust library into per-arch slices
+        run: |
+          mkdir -p rust-lib-arm64 rust-lib-x86_64
+          lipo rust-lib-macos/libsoftwarelicensor.a             -thin arm64  -output rust-lib-arm64/libsoftwarelicensor.a
+          lipo rust-lib-macos/libsoftwarelicensor.a             -thin x86_64 -output rust-lib-x86_64/libsoftwarelicensor.a
+          echo "Thinned libraries:"
+          lipo -info rust-lib-arm64/libsoftwarelicensor.a
+          lipo -info rust-lib-x86_64/libsoftwarelicensor.a
 
       # -- Build arm64 slice ----------------------------------------------------
       - name: Configure CMake - arm64
         run: |
           cmake -S mofoMojoVst -B build-arm64 \
+            -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_ARCHITECTURES="arm64" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0" \
-            -DRUST_LIBRARY_PATH="$(pwd)/rust-lib-macos/libsoftwarelicensor.a"
+            -DRUST_LIBRARY_PATH="$(pwd)/rust-lib-arm64/libsoftwarelicensor.a"
 
       - name: Build VST3 + AU - arm64
         run: |
-          cmake --build build-arm64 --config Release \
+          cmake --build build-arm64 \
             --target ViatorJuceCMake_VST3 ViatorJuceCMake_AU
 
       # -- Build x86_64 slice ---------------------------------------------------
       - name: Configure CMake - x86_64
         run: |
           cmake -S mofoMojoVst -B build-x86_64 \
+            -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_ARCHITECTURES="x86_64" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" \
-            -DRUST_LIBRARY_PATH="$(pwd)/rust-lib-macos/libsoftwarelicensor.a"
+            -DRUST_LIBRARY_PATH="$(pwd)/rust-lib-x86_64/libsoftwarelicensor.a"
 
       - name: Build VST3 + AU - x86_64
         run: |
-          cmake --build build-x86_64 --config Release \
+          cmake --build build-x86_64 \
             --target ViatorJuceCMake_VST3 ViatorJuceCMake_AU
 
       # -- Lipo-combine into universal bundles ----------------------------------
