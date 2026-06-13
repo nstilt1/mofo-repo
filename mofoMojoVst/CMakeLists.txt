@@ -181,24 +181,32 @@ target_link_libraries("${PROJECT_NAME}"
         "${RUST_LIBRARY}"
         ${PLATFORM_LIBS}
     PUBLIC
-        # juce_recommended_config_flags intentionally NOT used here:
-        # it propagates -O2 as a LINK flag which causes the macOS universal-binary
-        # and Windows MSVC linkers to hang for 1+ hours on JUCE + Rust .a.
-        # We apply optimisation flags at compile time only (see below).
-        juce::juce_recommended_warning_flags
+        # juce_recommended_config_flags intentionally NOT used here — it
+        # propagates -O2 as a LINK flag causing multi-hour linker hangs.
+        # juce_recommended_warning_flags intentionally NOT used here — it
+        # injects /W4 on MSVC which conflicts with add_definitions(-w) and
+        # generates hundreds of D9025 'overriding /w with /W4' warnings.
 )
 
 # ── Compile-only optimisation flags (no link-time codegen) ────────────────────
-# Replaces juce_recommended_config_flags.  We set -O2/-O0 only on compile
-# units; the linker sees no LTO / codegen flags so it stays fast.
+# We intentionally avoid /O2 on MSVC for JUCE plugin-client TUs.
+# juce_audio_plugin_client_VST3.cpp pulls in the entire VST3 SDK + JUCE
+# wrapper; MSVC's /O2 optimizer spends 60–90 min on that single TU on CI.
+# /O1 (optimize for size) compiles in under 5 min with negligible size cost
+# for SDK glue code.  User source files in Source/ still get /O2.
 if(MSVC)
+    # All plugin targets: /O1 safe default (avoids optimizer hang on SDK TUs)
     target_compile_options("${PROJECT_NAME}" PRIVATE
-        $<$<CONFIG:Release>:/O2 /Oi /Gy>
+        $<$<CONFIG:Release>:/O1 /Oi /Gy>
         $<$<CONFIG:Debug>:/Od /Zi>
     )
-    # Disable incremental linking in Release — it conflicts with Rust .a
+    # Disable incremental linking — it conflicts with the Rust .a
     target_link_options("${PROJECT_NAME}" PRIVATE
         $<$<CONFIG:Release>:/INCREMENTAL:NO>
+    )
+    # SharedCode (user sources only): upgrade to /O2 — these are small and fast
+    target_compile_options(SharedCode INTERFACE
+        $<$<CONFIG:Release>:/O2>
     )
 else()
     target_compile_options("${PROJECT_NAME}" PRIVATE
@@ -206,12 +214,10 @@ else()
         $<$<CONFIG:Debug>:-O0 -g>
     )
     if(APPLE)
-        # Visibility flags help dead-stripping but must be compile-only
         target_compile_options("${PROJECT_NAME}" PRIVATE
             -fvisibility=hidden
             -fvisibility-inlines-hidden
         )
-        # Pass -dead_strip to the linker (fast; does NOT require codegen passes)
         target_link_options("${PROJECT_NAME}" PRIVATE
             $<$<CONFIG:Release>:-Wl,-dead_strip>
         )

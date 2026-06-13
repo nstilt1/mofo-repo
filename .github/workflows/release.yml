@@ -145,7 +145,7 @@ jobs:
   build-windows:
     needs: build-rust-windows
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 45   # /O1 on MSVC compiles VST3 SDK TUs in ~5 min each vs 60+ with /O2
 
     steps:
       - uses: actions/checkout@v4
@@ -420,17 +420,18 @@ jobs:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 5: Build, sign, and package for macOS (universal x86_64 + arm64)
-# Split-arch strategy with Ninja generator and thin Rust .a slices.
-# Key insight: passing the universal (fat) libsoftwarelicensor.a to a
-# single-arch ld on macOS 14 causes ld to hang indefinitely parsing Rust
-# panic/unwind metadata across both slices.  We lipo-thin the .a first so
-# each build sees only the slice it needs.  Ninja is used instead of the
-# default Xcode generator so the hang is not masked by Xcode process
-# supervision and parallel compilation is explicit.
+# Split-arch strategy: arm64 and x86_64 built separately with per-arch thin
+# Rust .a files (uploaded as separate artifacts by build-rust-macos), then
+# lipo-combined.  Ninja generator for predictable parallel compilation.
+#
+# SELF-HOSTED RUNNER RECOMMENDED: set runs-on to [self-hosted, macos, arm64]
+# after registering your M1 Mac as a runner (Settings > Actions > Runners).
+# Self-hosting gives you: stable Xcode version, no pool wait, fast native
+# arm64 compile, and x86_64 via Rosetta 2 cross-compilation.
 # ─────────────────────────────────────────────────────────────────────────────
   build-macos:
     needs: build-rust-macos
-    runs-on: macos-14   # Xcode 15.x + macOS 14 SDK — required for JUCE 7.0.7
+    runs-on: macos-14   # or: [self-hosted, macos, arm64]
     timeout-minutes: 90
 
     steps:
