@@ -44,14 +44,19 @@ endif()
 add_definitions(-w)
 
 # ── Windows MSVC runtime ──────────────────────────────────────────────────────
-# Must be MultiThreadedDLL (/MD) to match the Rust static library's CRT linkage.
-# The Rust toolchain links against MSVCRT (the dynamic CRT) by default.
-# Using static /MT here causes LNK4098 (MSVCRT vs libcmt conflict) and dozens
-# of LNK2001 unresolved __imp__wassert / __imp_bsearch etc. errors because the
-# static CRT stubs don't export decorated import-library symbols that the Rust
-# .a objects expect to find via __imp_ indirection.
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>" CACHE INTERNAL "")
+# DO NOT set CMAKE_MSVC_RUNTIME_LIBRARY here.  JUCE 7's JUCEUtils.cmake calls
+# find_package(Threads) which runs a try_compile sub-project.  CMake 4.x
+# validates CMAKE_MSVC_RUNTIME_LIBRARY strictly against its known enum and
+# rejects 'MultiThreadedDLLDebug' (the $<CONFIG:Debug> expansion that CMake
+# generates for try_compile sub-projects), aborting configure.
+#
+# The Rust static library is built with the dynamic CRT (/MD, MSVCRT.dll).
+# JUCE's default is also /MD in Release.  We just need to make sure the static
+# CRT (/MT, libcmt) is never pulled in, which we do by explicitly excluding it.
+if(MSVC)
+    # Exclude the static CRT — Rust .a objects reference __imp_* symbols that
+    # only exist in the dynamic CRT import lib (MSVCRT.lib), not in libcmt.
+    add_link_options(/NODEFAULTLIB:libcmt /NODEFAULTLIB:libcmtd)
 endif()
 
 # ── Formats ───────────────────────────────────────────────────────────────────

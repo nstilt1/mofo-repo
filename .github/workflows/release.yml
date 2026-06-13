@@ -56,7 +56,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            software-licensor-client-side-library/target
+            software-licensor-client-side-library/software_licensor_static_rust_lib/target
           key: rust-macos-${{ hashFiles('software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
           restore-keys: rust-macos-
 
@@ -71,23 +71,24 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET=10.13 \
             cargo build --release --features logging --target x86_64-apple-darwin
 
+          # target/ is inside the working-directory (software_licensor_static_rust_lib/target/)
           echo "arm64 library:"
-          file ../target/aarch64-apple-darwin/release/libsoftwarelicensor.a
+          file target/aarch64-apple-darwin/release/libsoftwarelicensor.a
           echo "x86_64 library:"
-          file ../target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+          file target/x86_64-apple-darwin/release/libsoftwarelicensor.a
 
       - name: Upload Rust arm64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-macos-arm64
-          path: software-licensor-client-side-library/target/aarch64-apple-darwin/release/libsoftwarelicensor.a
+          path: software-licensor-client-side-library/software_licensor_static_rust_lib/target/aarch64-apple-darwin/release/libsoftwarelicensor.a
           retention-days: 7
 
       - name: Upload Rust x86_64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-macos-x86_64
-          path: software-licensor-client-side-library/target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+          path: software-licensor-client-side-library/software_licensor_static_rust_lib/target/x86_64-apple-darwin/release/libsoftwarelicensor.a
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
