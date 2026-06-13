@@ -134,7 +134,7 @@ jobs:
   build-windows:
     needs: build-rust-windows
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -173,7 +173,10 @@ jobs:
           cmake -S mofoMojoVst -B build-windows `
             -G "Visual Studio 17 2022" `
             -A x64 `
-            -DRUST_LIBRARY_PATH="$rustLib"
+            -DRUST_LIBRARY_PATH="$rustLib" `
+            -DCMAKE_EXE_LINKER_FLAGS_RELEASE="/INCREMENTAL:NO" `
+            -DCMAKE_SHARED_LINKER_FLAGS_RELEASE="/INCREMENTAL:NO" `
+            -DCMAKE_MODULE_LINKER_FLAGS_RELEASE="/INCREMENTAL:NO"
 
       - name: Build VST3 (Windows)
         shell: pwsh
@@ -412,7 +415,12 @@ jobs:
   build-macos:
     needs: build-rust-macos
     runs-on: macos-14   # Xcode 15.x + macOS 14 SDK — required for JUCE 7.0.7
-    timeout-minutes: 60
+    # Split-arch strategy: build arm64 and x86_64 separately then lipo-combine.
+    # Building CMAKE_OSX_ARCHITECTURES="x86_64;arm64" in one pass makes the
+    # linker do codegen for both slices simultaneously and hangs indefinitely
+    # even without LTO.  Two single-arch link steps + lipo is dramatically
+    # faster and produces an identical universal bundle.
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -438,27 +446,68 @@ jobs:
       - name: Install CMake
         uses: lukka/get-cmake@latest
 
-      - name: Configure CMake (macOS — default Xcode generator, universal binary)
+      # -- Build arm64 slice ----------------------------------------------------
+      - name: Configure CMake - arm64
         run: |
-          cmake -S mofoMojoVst -B build-macos \
+          cmake -S mofoMojoVst -B build-arm64 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DCMAKE_OSX_ARCHITECTURES="arm64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0" \
+            -DRUST_LIBRARY_PATH="$(pwd)/rust-lib-macos/libsoftwarelicensor.a"
+
+      - name: Build VST3 + AU - arm64
+        run: |
+          cmake --build build-arm64 --config Release \
+            --target ViatorJuceCMake_VST3 ViatorJuceCMake_AU
+
+      # -- Build x86_64 slice ---------------------------------------------------
+      - name: Configure CMake - x86_64
+        run: |
+          cmake -S mofoMojoVst -B build-x86_64 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" \
             -DRUST_LIBRARY_PATH="$(pwd)/rust-lib-macos/libsoftwarelicensor.a"
 
-      - name: Build VST3 + AU (macOS)
+      - name: Build VST3 + AU - x86_64
         run: |
-          cmake --build build-macos --config Release \
+          cmake --build build-x86_64 --config Release \
             --target ViatorJuceCMake_VST3 ViatorJuceCMake_AU
 
-          VST3=$(find build-macos -name "*.vst3" -type d | head -n 1)
-          AU=$(find build-macos -name "*.component" -type d | head -n 1)
-          [ -z "$VST3" ] && { echo "VST3 bundle not found"; exit 1; }
-          [ -z "$AU"   ] && { echo "AU bundle not found"; exit 1; }
-          echo "VST3_PATH=$VST3" >> "$GITHUB_ENV"
-          echo "AU_PATH=$AU"     >> "$GITHUB_ENV"
-          echo "VST3: $VST3"
-          echo "AU:   $AU"
+      # -- Lipo-combine into universal bundles ----------------------------------
+      - name: Lipo-combine slices into universal bundles
+        run: |
+          set -euo pipefail
+
+          VST3_ARM=$(find build-arm64  -name "*.vst3"      -type d | head -n 1)
+          VST3_X86=$(find build-x86_64 -name "*.vst3"      -type d | head -n 1)
+          AU_ARM=$(  find build-arm64  -name "*.component"  -type d | head -n 1)
+          AU_X86=$(  find build-x86_64 -name "*.component"  -type d | head -n 1)
+
+          [ -z "$VST3_ARM" ] && { echo "arm64 VST3 not found";   exit 1; }
+          [ -z "$VST3_X86" ] && { echo "x86_64 VST3 not found";  exit 1; }
+          [ -z "$AU_ARM"   ] && { echo "arm64 AU not found";      exit 1; }
+          [ -z "$AU_X86"   ] && { echo "x86_64 AU not found";     exit 1; }
+
+          lipo_bundle() {
+            local arm_bundle="$1" x86_bundle="$2" out_bundle="$3"
+            cp -r "$arm_bundle" "$out_bundle"
+            local bin_name
+            bin_name=$(basename "$(find "$arm_bundle/Contents/MacOS" -type f | head -n 1)")
+            lipo -create \
+              "$arm_bundle/Contents/MacOS/$bin_name" \
+              "$x86_bundle/Contents/MacOS/$bin_name" \
+              -output "$out_bundle/Contents/MacOS/$bin_name"
+            echo "lipo OK: $out_bundle ($(lipo -archs "$out_bundle/Contents/MacOS/$bin_name"))"
+          }
+
+          mkdir -p universal-bundles
+          PLUGIN_NAME="The Mofo's Mojo v1"
+          lipo_bundle "$VST3_ARM" "$VST3_X86" "universal-bundles/${PLUGIN_NAME}.vst3"
+          lipo_bundle "$AU_ARM"   "$AU_X86"   "universal-bundles/${PLUGIN_NAME}.component"
+
+          echo "VST3_PATH=$(pwd)/universal-bundles/${PLUGIN_NAME}.vst3" >> "$GITHUB_ENV"
+          echo "AU_PATH=$(pwd)/universal-bundles/${PLUGIN_NAME}.component" >> "$GITHUB_ENV"
 
       - name: Import signing certificates
         env:

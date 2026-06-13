@@ -93,7 +93,7 @@ endif()
 juce_add_plugin("${PROJECT_NAME}"
         COMPANY_NAME          "${COMPANY_NAME}"
         BUNDLE_ID             "${BUNDLE_ID}"
-        COPY_PLUGIN_AFTER_BUILD TRUE
+        COPY_PLUGIN_AFTER_BUILD FALSE   # disabled — CI runners lack write access to system plugin dirs
         PLUGIN_MANUFACTURER_CODE Abch
         PLUGIN_CODE           Mojo
         FORMATS               ${FORMATS}
@@ -170,9 +170,42 @@ target_link_libraries("${PROJECT_NAME}"
         "${RUST_LIBRARY}"
         ${PLATFORM_LIBS}
     PUBLIC
-        juce::juce_recommended_config_flags
+        # juce_recommended_config_flags intentionally NOT used here:
+        # it propagates -O2 as a LINK flag which causes the macOS universal-binary
+        # and Windows MSVC linkers to hang for 1+ hours on JUCE + Rust .a.
+        # We apply optimisation flags at compile time only (see below).
         juce::juce_recommended_warning_flags
 )
+
+# ── Compile-only optimisation flags (no link-time codegen) ────────────────────
+# Replaces juce_recommended_config_flags.  We set -O2/-O0 only on compile
+# units; the linker sees no LTO / codegen flags so it stays fast.
+if(MSVC)
+    target_compile_options("${PROJECT_NAME}" PRIVATE
+        $<$<CONFIG:Release>:/O2 /Oi /Gy>
+        $<$<CONFIG:Debug>:/Od /Zi>
+    )
+    # Disable incremental linking in Release — it conflicts with Rust .a
+    target_link_options("${PROJECT_NAME}" PRIVATE
+        $<$<CONFIG:Release>:/INCREMENTAL:NO>
+    )
+else()
+    target_compile_options("${PROJECT_NAME}" PRIVATE
+        $<$<CONFIG:Release>:-O2>
+        $<$<CONFIG:Debug>:-O0 -g>
+    )
+    if(APPLE)
+        # Visibility flags help dead-stripping but must be compile-only
+        target_compile_options("${PROJECT_NAME}" PRIVATE
+            -fvisibility=hidden
+            -fvisibility-inlines-hidden
+        )
+        # Pass -dead_strip to the linker (fast; does NOT require codegen passes)
+        target_link_options("${PROJECT_NAME}" PRIVATE
+            $<$<CONFIG:Release>:-Wl,-dead_strip>
+        )
+    endif()
+endif()
 
 target_include_directories("${PROJECT_NAME}" PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/Source"
