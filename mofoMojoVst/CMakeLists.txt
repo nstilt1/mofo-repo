@@ -44,8 +44,14 @@ endif()
 add_definitions(-w)
 
 # ── Windows MSVC runtime ──────────────────────────────────────────────────────
+# Must be MultiThreadedDLL (/MD) to match the Rust static library's CRT linkage.
+# The Rust toolchain links against MSVCRT (the dynamic CRT) by default.
+# Using static /MT here causes LNK4098 (MSVCRT vs libcmt conflict) and dozens
+# of LNK2001 unresolved __imp__wassert / __imp_bsearch etc. errors because the
+# static CRT stubs don't export decorated import-library symbols that the Rust
+# .a objects expect to find via __imp_ indirection.
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE INTERNAL "")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>" CACHE INTERNAL "")
 endif()
 
 # ── Formats ───────────────────────────────────────────────────────────────────

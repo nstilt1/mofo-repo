@@ -27,7 +27,11 @@ env:
   AWS_REGION: us-east-1
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Job 1: Build Rust static library for macOS (universal)
+# Job 1: Build Rust static library for macOS — two thin per-arch .a files.
+# We do NOT lipo-combine into a universal fat .a here.  Passing a fat .a to
+# a single-arch ld (even via lipo -thin afterwards) causes ld on macOS 14 to
+# hang or silently drop all objects.  Instead we upload the two thin archives
+# produced directly by cargo and feed each one to the matching arch build.
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
   build-rust-macos:
@@ -56,30 +60,34 @@ jobs:
           key: rust-macos-${{ hashFiles('software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
           restore-keys: rust-macos-
 
-      - name: Build universal Rust static library (macOS)
+      - name: Build Rust static libraries — arm64 and x86_64 (macOS)
         working-directory: software-licensor-client-side-library/software_licensor_static_rust_lib
-        env:
-          MACOSX_DEPLOYMENT_TARGET: "10.13"
         run: |
-          rustup target add aarch64-apple-darwin
-          rustup target add x86_64-apple-darwin
+          # arm64: minimum deployment target 11.0 (Apple Silicon minimum)
+          MACOSX_DEPLOYMENT_TARGET=11.0 \
+            cargo build --release --features logging --target aarch64-apple-darwin
 
-          cargo build --release --features logging --target aarch64-apple-darwin
-          cargo build --release --features logging --target x86_64-apple-darwin
+          # x86_64: minimum deployment target 10.13
+          MACOSX_DEPLOYMENT_TARGET=10.13 \
+            cargo build --release --features logging --target x86_64-apple-darwin
 
-          mkdir -p ../target/universal
-          lipo -create -o ../target/universal/libsoftwarelicensor.a \
-            ../target/aarch64-apple-darwin/release/libsoftwarelicensor.a \
-            ../target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+          echo "arm64 library:"
+          file ../target/aarch64-apple-darwin/release/libsoftwarelicensor.a
+          echo "x86_64 library:"
+          file ../target/x86_64-apple-darwin/release/libsoftwarelicensor.a
 
-          echo "Universal library built:"
-          lipo -info ../target/universal/libsoftwarelicensor.a
-
-      - name: Upload Rust macOS artifact
+      - name: Upload Rust arm64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rust-lib-macos
-          path: software-licensor-client-side-library/target/universal/libsoftwarelicensor.a
+          name: rust-lib-macos-arm64
+          path: software-licensor-client-side-library/target/aarch64-apple-darwin/release/libsoftwarelicensor.a
+          retention-days: 7
+
+      - name: Upload Rust x86_64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-lib-macos-x86_64
+          path: software-licensor-client-side-library/target/x86_64-apple-darwin/release/libsoftwarelicensor.a
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -439,26 +447,20 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Detected version: $VERSION"
 
-      - name: Download Rust macOS library
+      - name: Download Rust arm64 library
         uses: actions/download-artifact@v4
         with:
-          name: rust-lib-macos
-          path: rust-lib-macos/
+          name: rust-lib-macos-arm64
+          path: rust-lib-arm64/
+
+      - name: Download Rust x86_64 library
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-lib-macos-x86_64
+          path: rust-lib-x86_64/
 
       - name: Install CMake + Ninja
         uses: lukka/get-cmake@latest
-
-      # Thin the universal .a into per-arch slices before passing to the linker.
-      # Feeding a fat .a to single-arch ld on macOS 14 causes it to hang
-      # parsing Rust unwind/panic metadata across both slices simultaneously.
-      - name: Thin Rust library into per-arch slices
-        run: |
-          mkdir -p rust-lib-arm64 rust-lib-x86_64
-          lipo rust-lib-macos/libsoftwarelicensor.a             -thin arm64  -output rust-lib-arm64/libsoftwarelicensor.a
-          lipo rust-lib-macos/libsoftwarelicensor.a             -thin x86_64 -output rust-lib-x86_64/libsoftwarelicensor.a
-          echo "Thinned libraries:"
-          lipo -info rust-lib-arm64/libsoftwarelicensor.a
-          lipo -info rust-lib-x86_64/libsoftwarelicensor.a
 
       # -- Build arm64 slice ----------------------------------------------------
       - name: Configure CMake - arm64
