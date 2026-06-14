@@ -641,20 +641,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Extract version from .jucer file
-        shell: pwsh
         run: |
-          $path = "mofoMojoVst/Mofo Filter.jucer"
-          $content = Get-Content $path -Raw
-
-          # Match ONLY the version attribute inside the JUCERPROJECT tag
-          if ($content -match '<JUCERPROJECT[^>]*version="([^"]+)"') {
-              $version = $matches[1]
-              Write-Host "Detected version: $version"
-              "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } else {
-              Write-Error "Version attribute not found in JUCERPROJECT tag"
-              exit 1
-          }
+          # macOS runner has no pwsh; use bash + perl (preinstalled on macOS).
+          # perl -0777 slurps the whole file so [^>]* can span newlines inside
+          # the opening tag, matching ONLY the JUCERPROJECT version attribute
+          # (not an earlier version= attribute elsewhere in the XML).
+          VERSION=$(perl -0777 -ne 'print "$1\n" if /<JUCERPROJECT[^>]*version="([^"]+)"/' "mofoMojoVst/Mofo Filter.jucer" | head -n1)
+          if [ -z "$VERSION" ]; then
+            echo "Version attribute not found in JUCERPROJECT tag" >&2
+            exit 1
+          fi
+          echo "Detected version: $VERSION"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Download Rust arm64 library
         uses: actions/download-artifact@v4
