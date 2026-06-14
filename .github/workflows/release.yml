@@ -39,9 +39,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: true
+
+      - name: Diagnostics — environment
+        run: |
+          set -euxo pipefail
+          echo "PWD: $(pwd)"
+          echo "whoami: $(whoami)"
+          which git cargo rustup || true
+          rustup show || true
+          rustup target list --installed || true
 
       - name: Clone software-licensor-client-side-library
         run: |
+          set -euxo pipefail
           # Self-hosted runner workspace persists between runs — remove any
           # stale clone from a previous run before cloning fresh.
           rm -rf software-licensor-client-side-library
@@ -66,6 +78,8 @@ jobs:
       - name: Build Rust static libraries — arm64 and x86_64 (macOS)
         working-directory: software-licensor-client-side-library/software_licensor_static_rust_lib
         run: |
+          set -euxo pipefail
+
           # arm64: minimum deployment target 11.0 (Apple Silicon minimum)
           MACOSX_DEPLOYMENT_TARGET=11.0 \
             cargo build --release --features logging --target aarch64-apple-darwin
@@ -79,6 +93,8 @@ jobs:
           file target/aarch64-apple-darwin/release/libsoftwarelicensor.a
           echo "x86_64 library:"
           file target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+          ls -la target/aarch64-apple-darwin/release/libsoftwarelicensor.a \
+                 target/x86_64-apple-darwin/release/libsoftwarelicensor.a
 
       - name: Upload Rust arm64 artifact
         uses: actions/upload-artifact@v4
@@ -102,6 +118,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Clone software-licensor-client-side-library
         shell: powershell
@@ -113,10 +131,22 @@ jobs:
           }
           git clone https://github.com/nstilt1/software-licensor-client-side-library software-licensor-client-side-library
 
+      # dtolnay/rust-toolchain is NOT used here: its composite action
+      # internally hardcodes `shell: C:\Windows\system32\bash.EXE` for a
+      # "parse toolchain version" step, which hits the same MSYS2 path-
+      # mangling bug ("I:actions-runner_work_temp...sh: No such file or
+      # directory") that affects all Git-Bash `run:` steps on self-hosted
+      # Windows runners — and we can't add `shell:` overrides inside someone
+      # else's composite action. Install/ensure the toolchain via rustup
+      # directly in PowerShell instead.
       - name: Install Rust stable (Windows MSVC)
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
+        shell: powershell
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-msvc --no-self-update
+          rustup default stable-x86_64-pc-windows-msvc
+          rustup target add x86_64-pc-windows-msvc
+          rustc --version
+          cargo --version
 
       - name: Cache Rust build (Windows)
         uses: actions/cache@v4
@@ -158,6 +188,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Extract version from .jucer file
         shell: powershell
