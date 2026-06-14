@@ -420,29 +420,67 @@ jobs:
             "$($dll.FullName)"
           if ($LASTEXITCODE -ne 0) { Write-Error "signtool failed to sign the VST3"; exit 1 }
 
-      - name: Install NSIS (portable — no admin / no Chocolatey)
+      - name: Ensure NSIS (use installed, else portable download)
         shell: powershell
         run: |
-          # The self-hosted runner runs as a non-admin user, so `choco install`
-          # can't write to C:\ProgramData\chocolatey.  Download the portable
-          # NSIS zip into a runner-writable dir and put makensis.exe on PATH.
-          $ver = "3.11"
-          $dir = Join-Path $env:RUNNER_TEMP "nsis"
-          if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
-          New-Item -ItemType Directory -Force -Path $dir | Out-Null
-          $zip = Join-Path $dir "nsis.zip"
-          $url = "https://downloads.sourceforge.net/project/nsis/NSIS%203/$ver/nsis-$ver.zip"
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          Write-Host "Downloading NSIS $ver from $url"
-          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-          Expand-Archive -Path $zip -DestinationPath $dir -Force
-          $makensis = Get-ChildItem -Recurse -Path $dir -Filter "makensis.exe" |
-            Select-Object -First 1
-          if (-not $makensis) { Write-Error "makensis.exe not found after extracting NSIS"; exit 1 }
-          Write-Host "makensis at: $($makensis.FullName)"
-          # Put its directory on PATH for later steps (makensis finds its
-          # Stubs/Plugins/Include relative to its own exe location).
-          Split-Path $makensis.FullName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Prefer an NSIS already installed on this (persistent) runner — most
+          # reliable.  Install once with `winget install NSIS.NSIS` (as admin)
+          # or the NSIS installer, and this step will just find it.  Falls back
+          # to a validated portable download only if none is present.
+          function Find-MakeNSIS {
+            $cmd = Get-Command makensis.exe -ErrorAction SilentlyContinue
+            if ($cmd) { return $cmd.Source }
+            foreach ($p in @("C:\Program Files (x86)\NSIS\makensis.exe",
+                             "C:\Program Files\NSIS\makensis.exe")) {
+              if (Test-Path $p) { return $p }
+            }
+            return $null
+          }
+
+          $makensis = Find-MakeNSIS
+          if (-not $makensis) {
+            $ver = "3.11"
+            $dir = Join-Path $env:RUNNER_TEMP "nsis"
+            if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+            $zip = Join-Path $dir "nsis.zip"
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            # SourceForge's redirector often serves an HTML interstitial instead
+            # of the file, so try several mirrors and verify the 'PK' zip magic
+            # before trusting the download.
+            $urls = @(
+              "https://master.dl.sourceforge.net/project/nsis/NSIS%203/$ver/nsis-$ver.zip?viasf=1",
+              "https://downloads.sourceforge.net/project/nsis/NSIS%203/$ver/nsis-$ver.zip",
+              "https://phoenixnap.dl.sourceforge.net/project/nsis/NSIS%203/$ver/nsis-$ver.zip?viasf=1"
+            )
+            $ok = $false
+            foreach ($u in $urls) {
+              try {
+                Write-Host "Downloading NSIS from $u"
+                Invoke-WebRequest -Uri $u -OutFile $zip -UseBasicParsing -MaximumRedirection 10
+                $fs = [System.IO.File]::OpenRead($zip)
+                $b = New-Object byte[] 2; [void]$fs.Read($b, 0, 2); $fs.Close()
+                if ($b[0] -eq 0x50 -and $b[1] -eq 0x4B) { $ok = $true; break }
+                Write-Host ("  -> not a zip (first bytes 0x{0:X2}{1:X2}); trying next mirror" -f $b[0], $b[1])
+              } catch {
+                Write-Host "  -> download failed: $($_.Exception.Message)"
+              }
+            }
+            if (-not $ok) {
+              Write-Error ("Could not fetch a valid NSIS zip from any mirror. " +
+                "Install NSIS on the runner once (e.g. 'winget install NSIS.NSIS' " +
+                "in an elevated shell) and re-run.")
+              exit 1
+            }
+            Expand-Archive -Path $zip -DestinationPath $dir -Force
+            $mk = Get-ChildItem -Recurse -Path $dir -Filter "makensis.exe" | Select-Object -First 1
+            if (-not $mk) { Write-Error "makensis.exe not found after extracting NSIS"; exit 1 }
+            $makensis = $mk.FullName
+          }
+
+          Write-Host "Using makensis: $makensis"
+          # makensis finds its Stubs/Plugins/Include relative to its own exe.
+          Split-Path $makensis | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Create NSIS installer script
         shell: powershell
