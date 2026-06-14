@@ -71,8 +71,12 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            software-licensor-client-side-library/software_licensor_static_rust_lib/target
-          key: rust-macos-${{ hashFiles('software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
+            # Cargo writes artifacts to the WORKSPACE-ROOT target/, not the
+            # member crate's dir — this is a virtual workspace (see root
+            # Cargo.toml: [workspace] members = ["software_licensor_static_rust_lib"]).
+            software-licensor-client-side-library/target
+          # Lockfile lives at the workspace root, not in the member crate.
+          key: rust-macos-${{ hashFiles('software-licensor-client-side-library/Cargo.lock') }}
           restore-keys: rust-macos-
 
       - name: Build Rust static libraries — arm64 and x86_64 (macOS)
@@ -88,22 +92,23 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET=10.13 \
             cargo build --release --features logging --target x86_64-apple-darwin
 
-          # The crate's [lib] name may not be "softwarelicensor" — discover
-          # whatever .a file cargo actually produced rather than assuming.
-          echo "Contents of target/aarch64-apple-darwin/release/:"
-          ls -la target/aarch64-apple-darwin/release/ || true
-          echo "Contents of target/x86_64-apple-darwin/release/:"
-          ls -la target/x86_64-apple-darwin/release/ || true
+          # NOTE: this crate is a member of a virtual Cargo workspace, so cargo
+          # writes ALL artifacts to the workspace-root target/ (one level up),
+          # NOT to this member crate's own target/.  Hence ../target below.
+          echo "Contents of ../target/aarch64-apple-darwin/release/:"
+          ls -la ../target/aarch64-apple-darwin/release/ || true
+          echo "Contents of ../target/x86_64-apple-darwin/release/:"
+          ls -la ../target/x86_64-apple-darwin/release/ || true
 
-          ARM64_LIB=$(find target/aarch64-apple-darwin/release -maxdepth 1 -name '*.a' | head -n 1)
-          X86_64_LIB=$(find target/x86_64-apple-darwin/release -maxdepth 1 -name '*.a' | head -n 1)
+          ARM64_LIB=$(find ../target/aarch64-apple-darwin/release -maxdepth 1 -name '*.a' | head -n 1)
+          X86_64_LIB=$(find ../target/x86_64-apple-darwin/release -maxdepth 1 -name '*.a' | head -n 1)
 
           if [ -z "$ARM64_LIB" ]; then
-            echo "ERROR: no .a file found in target/aarch64-apple-darwin/release/"
+            echo "ERROR: no .a file found in ../target/aarch64-apple-darwin/release/"
             exit 1
           fi
           if [ -z "$X86_64_LIB" ]; then
-            echo "ERROR: no .a file found in target/x86_64-apple-darwin/release/"
+            echo "ERROR: no .a file found in ../target/x86_64-apple-darwin/release/"
             exit 1
           fi
 
@@ -114,21 +119,21 @@ jobs:
 
           # Normalise to a known filename for the upload/download steps and
           # for CMakeLists.txt's RUST_LIBRARY_PATH expectation.
-          cp "$ARM64_LIB"  target/aarch64-apple-darwin/release/libsoftwarelicensor.a
-          cp "$X86_64_LIB" target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+          cp "$ARM64_LIB"  ../target/aarch64-apple-darwin/release/libsoftwarelicensor.a
+          cp "$X86_64_LIB" ../target/x86_64-apple-darwin/release/libsoftwarelicensor.a
 
       - name: Upload Rust arm64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-macos-arm64
-          path: software-licensor-client-side-library/software_licensor_static_rust_lib/target/aarch64-apple-darwin/release/libsoftwarelicensor.a
+          path: software-licensor-client-side-library/target/aarch64-apple-darwin/release/libsoftwarelicensor.a
           retention-days: 7
 
       - name: Upload Rust x86_64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-macos-x86_64
-          path: software-licensor-client-side-library/software_licensor_static_rust_lib/target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+          path: software-licensor-client-side-library/target/x86_64-apple-darwin/release/libsoftwarelicensor.a
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -175,8 +180,11 @@ jobs:
           path: |
             ~\.cargo\registry
             ~\.cargo\git
-            software-licensor-client-side-library\software_licensor_static_rust_lib\target
-          key: rust-windows-${{ hashFiles('software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
+            # Virtual workspace: artifacts land in the workspace-root target\,
+            # not in the member crate's dir.
+            software-licensor-client-side-library\target
+          # Lockfile is at the workspace root, not in the member crate.
+          key: rust-windows-${{ hashFiles('software-licensor-client-side-library/Cargo.lock') }}
           restore-keys: rust-windows-
 
       - name: Build Rust static library (Windows)
@@ -185,28 +193,29 @@ jobs:
         run: |
           cargo build --release --features logging --target x86_64-pc-windows-msvc
 
-          # The crate's [lib] name may not be "softwarelicensor" — discover
-          # whatever .lib file cargo actually produced rather than assuming.
-          Write-Host "Contents of target\x86_64-pc-windows-msvc\release\:"
-          Get-ChildItem target\x86_64-pc-windows-msvc\release\ | Format-Table Name, Length
+          # NOTE: virtual Cargo workspace — cargo writes artifacts to the
+          # workspace-root target\ (one level up), NOT this member crate's
+          # own target\.  Hence ..\target below.
+          Write-Host "Contents of ..\target\x86_64-pc-windows-msvc\release\:"
+          Get-ChildItem ..\target\x86_64-pc-windows-msvc\release\ | Format-Table Name, Length
 
-          $lib = Get-ChildItem target\x86_64-pc-windows-msvc\release\*.lib | Select-Object -First 1
+          $lib = Get-ChildItem ..\target\x86_64-pc-windows-msvc\release\*.lib | Select-Object -First 1
           if (-not $lib) {
-            Write-Error "No .lib file found in target\x86_64-pc-windows-msvc\release\"
+            Write-Error "No .lib file found in ..\target\x86_64-pc-windows-msvc\release\"
             exit 1
           }
           Write-Host "Found library: $($lib.FullName)"
 
           # Normalise to a known filename for the upload/download steps and
           # for CMakeLists.txt's RUST_LIBRARY_PATH expectation.
-          Copy-Item $lib.FullName target\x86_64-pc-windows-msvc\release\softwarelicensor.lib -Force
-          Get-Item target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+          Copy-Item $lib.FullName ..\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib -Force
+          Get-Item ..\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
 
       - name: Upload Rust Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-windows
-          path: software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+          path: software-licensor-client-side-library\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────

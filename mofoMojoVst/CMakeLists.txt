@@ -10,12 +10,12 @@ set(CURRENT_VERSION "${CMAKE_MATCH_1}")
 message(STATUS "Plugin version: ${CURRENT_VERSION}")
 
 # ── General setup ──────────────────────────────────────────────────────────────
-set(PROJECT_NAME  "ViatorJuceCMake")
+set(PROJECT_NAME  "HyperformanceSolutionsCMake")
 set(PRODUCT_NAME  "The Mofo's Mojo v1")
 set(COMPANY_NAME  "Altered Brain Chemistry")
 set(BUNDLE_ID     "com.alteredbrainchemistry.MofoMojoFilter")
 
-project(ViatorJuceCMake VERSION ${CURRENT_VERSION})
+project(HyperformanceSolutionsCMake VERSION ${CURRENT_VERSION})
 
 # ── JUCE 7.0.7 (pinned) ───────────────────────────────────────────────────────
 add_subdirectory(modules/JUCE-7.0.7)
@@ -209,8 +209,10 @@ if(MSVC)
         $<$<CONFIG:Release>:/O2>
     )
 else()
+    # Self-hosted runners have ample compute and clang/gcc have no MSVC-style
+    # single-TU optimizer pathology, so use -O3 for maximum Release perf.
     target_compile_options("${PROJECT_NAME}" PRIVATE
-        $<$<CONFIG:Release>:-O2>
+        $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:Debug>:-O0 -g>
     )
     if(APPLE)
