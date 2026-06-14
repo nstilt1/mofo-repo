@@ -35,7 +35,7 @@ env:
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
   build-rust-macos:
-    runs-on: macos-latest
+    runs-on: [self-hosted, macos, arm64]
 
     steps:
       - uses: actions/checkout@v4
@@ -95,7 +95,7 @@ jobs:
 # Job 2: Build Rust static library for Windows
 # ─────────────────────────────────────────────────────────────────────────────
   build-rust-windows:
-    runs-on: windows-latest
+    runs-on: [self-hosted, windows, x64]
 
     steps:
       - uses: actions/checkout@v4
@@ -144,7 +144,7 @@ jobs:
 # ─────────────────────────────────────────────────────────────────────────────
   build-windows:
     needs: build-rust-windows
-    runs-on: windows-latest
+    runs-on: [self-hosted, windows, x64]
     timeout-minutes: 45   # /O1 on MSVC compiles VST3 SDK TUs in ~5 min each vs 60+ with /O2
 
     steps:
@@ -431,7 +431,7 @@ jobs:
 # ─────────────────────────────────────────────────────────────────────────────
   build-macos:
     needs: build-rust-macos
-    runs-on: macos-14   # or: [self-hosted, macos, arm64]
+    runs-on: [self-hosted, macos, arm64]   # or: [self-hosted, macos, arm64]
     timeout-minutes: 90
 
     steps:
