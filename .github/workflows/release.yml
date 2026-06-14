@@ -271,6 +271,32 @@ jobs:
         with:
           arch: x64
 
+      # trusted-signing-cli finds signtool.exe by guessing a Windows SDK
+      # version (it guesses 10.0.26100.0, which isn't installed here), so we
+      # point it at the newest signtool.exe that ACTUALLY exists via the
+      # SIGNTOOL_PATH env var it documents.  signtool ships with the "Windows
+      # SDK Signing Tools for Desktop Apps" component (already on this runner);
+      # it is just not on the global PATH, which is why `signtool` alone fails
+      # in a plain cmd prompt.
+      - name: Locate signtool for trusted-signing-cli
+        shell: powershell
+        run: |
+          $kitsBin = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $signtool = Get-ChildItem $kitsBin -Directory -ErrorAction SilentlyContinue |
+            Where-Object { Test-Path (Join-Path $_.FullName "x64\signtool.exe") } |
+            Sort-Object { try { [version]$_.Name } catch { [version]"0.0" } } -Descending |
+            Select-Object -First 1
+          if (-not $signtool) {
+            Write-Error ("signtool.exe not found under $kitsBin\*\x64\. " +
+              "Install the 'Windows SDK Signing Tools for Desktop Apps' component " +
+              "(Visual Studio Installer > Individual components, or the standalone " +
+              "Windows 10/11 SDK installer).")
+            exit 1
+          }
+          $signtoolPath = Join-Path $signtool.FullName "x64\signtool.exe"
+          Write-Host "Using signtool: $signtoolPath"
+          "SIGNTOOL_PATH=$signtoolPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Install CMake + Ninja
         uses: lukka/get-cmake@latest
 
@@ -336,7 +362,7 @@ jobs:
           $out = & az login --service-principal -t $env:AZURE_TENANT_ID -u $env:AZURE_CLIENT_ID -p $env:AZURE_CLIENT_SECRET --allow-no-subscriptions 2>&1
           if ($LASTEXITCODE -eq 0) {
             Write-Host "==> AUTH OK: tenant + client-id + secret are ALL valid."
-            Write-Host "==> So the sign failure is NOT a bad secret. The service principal"
+            Write-Host "==> So a sign failure here is NOT a bad secret. The service principal"
             Write-Host "    just has no subscription/role visible to 'az login', which"
             Write-Host "    trusted-signing-cli calls WITHOUT --allow-no-subscriptions."
             Write-Host "    Fix: assign the SP a role so a subscription is visible (see notes)."
@@ -348,8 +374,7 @@ jobs:
             Write-Host "    AADSTS7000215 -> AZURE_CLIENT_SECRET is wrong"
             Write-Host "    AADSTS7000222 -> AZURE_CLIENT_SECRET has expired"
           }
-          # Informational only — never fail the job here.
-          exit 0
+          exit 0   # informational only — never fail the job here
 
       - name: Sign VST3 (Windows — Azure Trusted Signing)
         shell: powershell
@@ -692,21 +717,39 @@ jobs:
           echo "$APPLE_INSTALLER_CERTIFICATE" | base64 --decode > /tmp/installer-cert.p12
           security import /tmp/installer-cert.p12 -k "$KEYCHAIN_PATH" \
             -P "$APPLE_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/productbuild
-          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          # Pull Apple's intermediate + root into the build keychain so codesign
+          # can build the full chain (leaf -> "Developer ID Certification
+          # Authority" -> "Apple Root CA").  These are NOT inside the .p12.
+          # Non-fatal: the search-list change below also exposes them via the
+          # System/login keychains.
+          curl -fsSL -o /tmp/DeveloperIDG2CA.cer https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer \
+            && security import /tmp/DeveloperIDG2CA.cer -k "$KEYCHAIN_PATH" 2>/dev/null \
+            || echo "WARN: could not import Developer ID G2 intermediate (continuing)"
+          curl -fsSL -o /tmp/AppleRootCA.cer https://www.apple.com/appleca/AppleIncRootCertificate.cer \
+            && security import /tmp/AppleRootCA.cer -k "$KEYCHAIN_PATH" 2>/dev/null \
+            || echo "WARN: could not import Apple Root CA (continuing)"
+
+          # CRITICAL: add the build keychain to the search list WITHOUT dropping
+          # the System/login keychains.  Replacing the list with only the build
+          # keychain hid Apple's CA certs, causing "unable to build chain to
+          # self-signed root" and errSecInternalComponent.
+          security list-keychains -d user -s "$KEYCHAIN_PATH" \
+            "$HOME/Library/Keychains/login.keychain-db" \
+            "/Library/Keychains/System.keychain"
+
+          # Let apple tools use the private keys without an interactive prompt.
           security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN_PATH"
-          rm /tmp/app-cert.p12 /tmp/installer-cert.p12
+          rm -f /tmp/app-cert.p12 /tmp/installer-cert.p12 \
+                /tmp/DeveloperIDG2CA.cer /tmp/AppleRootCA.cer
 
       - name: Sign VST3 bundle (macOS)
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
-          # No --entitlements: App-Sandbox entitlements are inert for a plugin
-          # loaded into a (non-sandboxed) DAW, and the hardened runtime does not
-          # restrict network or file access.  --timestamp is required for
-          # notarization (a secure timestamp).
           codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" \
             --options runtime \
-            --timestamp \
+            --entitlements mofoMojoVst/entitlements.plist \
             "$VST3_PATH"
           codesign --verify --deep --strict "$VST3_PATH"
           echo "VST3 signed OK"
@@ -717,7 +760,7 @@ jobs:
         run: |
           codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" \
             --options runtime \
-            --timestamp \
+            --entitlements mofoMojoVst/entitlements.plist \
             "$AU_PATH"
           codesign --verify --deep --strict "$AU_PATH"
           echo "AU signed OK"
