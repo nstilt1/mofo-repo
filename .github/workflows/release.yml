@@ -118,9 +118,14 @@ jobs:
           file "$X86_64_LIB"
 
           # Normalise to a known filename for the upload/download steps and
-          # for CMakeLists.txt's RUST_LIBRARY_PATH expectation.
-          cp "$ARM64_LIB"  ../target/aarch64-apple-darwin/release/libsoftwarelicensor.a
-          cp "$X86_64_LIB" ../target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+          # for CMakeLists.txt's RUST_LIBRARY_PATH expectation.  cargo already
+          # names the staticlib libsoftwarelicensor.a (the crate's [lib] name
+          # IS softwarelicensor), so the discovered file usually IS the target
+          # — skip the copy in that case to avoid "are identical" errors.
+          ARM64_DEST=../target/aarch64-apple-darwin/release/libsoftwarelicensor.a
+          X86_64_DEST=../target/x86_64-apple-darwin/release/libsoftwarelicensor.a
+          [ "$ARM64_LIB"  -ef "$ARM64_DEST"  ] || cp "$ARM64_LIB"  "$ARM64_DEST"
+          [ "$X86_64_LIB" -ef "$X86_64_DEST" ] || cp "$X86_64_LIB" "$X86_64_DEST"
 
       - name: Upload Rust arm64 artifact
         uses: actions/upload-artifact@v4
@@ -207,9 +212,15 @@ jobs:
           Write-Host "Found library: $($lib.FullName)"
 
           # Normalise to a known filename for the upload/download steps and
-          # for CMakeLists.txt's RUST_LIBRARY_PATH expectation.
-          Copy-Item $lib.FullName ..\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib -Force
-          Get-Item ..\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+          # for CMakeLists.txt's RUST_LIBRARY_PATH expectation.  cargo already
+          # names the staticlib softwarelicensor.lib (the crate's [lib] name IS
+          # softwarelicensor), so the discovered file usually IS the target —
+          # skip the copy in that case to avoid "overwrite ... with itself".
+          $dest = Join-Path $lib.DirectoryName "softwarelicensor.lib"
+          if ($lib.FullName -ne $dest) {
+            Copy-Item $lib.FullName $dest -Force
+          }
+          Get-Item $dest
 
       - name: Upload Rust Windows artifact
         uses: actions/upload-artifact@v4
