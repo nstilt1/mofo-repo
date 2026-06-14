@@ -271,14 +271,12 @@ jobs:
         with:
           arch: x64
 
-      # trusted-signing-cli finds signtool.exe by guessing a Windows SDK
-      # version (it guesses 10.0.26100.0, which isn't installed here), so we
-      # point it at the newest signtool.exe that ACTUALLY exists via the
-      # SIGNTOOL_PATH env var it documents.  signtool ships with the "Windows
-      # SDK Signing Tools for Desktop Apps" component (already on this runner);
-      # it is just not on the global PATH, which is why `signtool` alone fails
-      # in a plain cmd prompt.
-      - name: Locate signtool for trusted-signing-cli
+      # We invoke signtool directly with the Trusted Signing /dlib plugin
+      # (see the sign steps below).  signtool ships with the "Windows SDK
+      # Signing Tools for Desktop Apps" component (already on this runner) but
+      # is not on the global PATH — that's why `signtool` alone fails in a
+      # plain cmd prompt.  Resolve its full path here and export SIGNTOOL_PATH.
+      - name: Locate signtool
         shell: powershell
         run: |
           $kitsBin = "C:\Program Files (x86)\Windows Kits\10\bin"
@@ -321,16 +319,28 @@ jobs:
           echo "VST3_PATH=$($vst3.FullName)" >> $env:GITHUB_ENV
           Write-Host "Built VST3 at: $($vst3.FullName)"
 
-      - name: Install trusted-signing-cli
+      - name: Download Trusted Signing dlib
         shell: powershell
         run: |
-          # PS 5.1 has no `||` pipeline-chain operator; use try/catch instead.
-          try {
-            cargo install trusted-signing-cli --version 0.9.0 --quiet 2>$null
-          } catch {
-            Write-Host "trusted-signing-cli already installed or install failed (continuing)"
-          }
-          echo "$env:USERPROFILE\.cargo\bin" >> $env:GITHUB_PATH
+          # signtool's /dlib plugin authenticates via Azure.Identity directly
+          # from AZURE_TENANT_ID/AZURE_CLIENT_ID/AZURE_CLIENT_SECRET — no
+          # `az login`, so NO Azure subscription is required (only the
+          # data-plane "Trusted Signing Certificate Profile Signer" role on the
+          # signing account).  This replaces trusted-signing-cli, which forced
+          # an `az login` that fails when the SP can't enumerate a subscription.
+          $dir = Join-Path $env:RUNNER_TEMP "tsdlib"
+          if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $zip = Join-Path $dir "client.zip"
+          $url = "https://www.nuget.org/api/v2/package/Microsoft.ArtifactSigning.Client/1.0.128"
+          Write-Host "Downloading Trusted Signing client from $url"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          $dlib = Get-ChildItem -Recurse -Path $dir -Filter "Azure.CodeSigning.Dlib.dll" |
+            Select-Object -First 1
+          if (-not $dlib) { Write-Error "Azure.CodeSigning.Dlib.dll not found in package"; exit 1 }
+          Write-Host "Dlib: $($dlib.FullName)"
+          "TS_DLIB_PATH=$($dlib.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Diagnose Azure credentials (informational — does not sign)
         shell: powershell
@@ -362,10 +372,9 @@ jobs:
           $out = & az login --service-principal -t $env:AZURE_TENANT_ID -u $env:AZURE_CLIENT_ID -p $env:AZURE_CLIENT_SECRET --allow-no-subscriptions 2>&1
           if ($LASTEXITCODE -eq 0) {
             Write-Host "==> AUTH OK: tenant + client-id + secret are ALL valid."
-            Write-Host "==> So a sign failure here is NOT a bad secret. The service principal"
-            Write-Host "    just has no subscription/role visible to 'az login', which"
-            Write-Host "    trusted-signing-cli calls WITHOUT --allow-no-subscriptions."
-            Write-Host "    Fix: assign the SP a role so a subscription is visible (see notes)."
+            Write-Host "    Signing below uses the dlib's env-var auth (no subscription needed),"
+            Write-Host "    so if it still fails, check the SP has the 'Trusted Signing"
+            Write-Host "    Certificate Profile Signer' role on the signing account."
           } else {
             Write-Host "==> AUTH FAILED. Azure CLI output (look for the AADSTS code):"
             Write-Host ($out | Out-String)
@@ -390,11 +399,19 @@ jobs:
           if (-not $dll) { $dll = Get-Item "$env:VST3_PATH" -ErrorAction SilentlyContinue }
           if (-not $dll) { Write-Error "Could not locate .vst3 DLL to sign"; exit 1 }
           Write-Host "Signing: $($dll.FullName)"
-          trusted-signing-cli `
-            -e $env:AZURE_SIGNING_ENDPOINT `
-            -a $env:AZURE_SIGNING_ACCOUNT `
-            -c $env:AZURE_SIGNING_PROFILE `
+
+          $meta = Join-Path $env:RUNNER_TEMP "ts-metadata.json"
+          @{
+            Endpoint               = $env:AZURE_SIGNING_ENDPOINT
+            CodeSigningAccountName = $env:AZURE_SIGNING_ACCOUNT
+            CertificateProfileName = $env:AZURE_SIGNING_PROFILE
+          } | ConvertTo-Json | Set-Content -Path $meta -Encoding utf8
+
+          & "$env:SIGNTOOL_PATH" sign /v /fd SHA256 `
+            /tr http://timestamp.acs.microsoft.com/ /td SHA256 `
+            /dlib "$env:TS_DLIB_PATH" /dmdf "$meta" `
             "$($dll.FullName)"
+          if ($LASTEXITCODE -ne 0) { Write-Error "signtool failed to sign the VST3"; exit 1 }
 
       - name: Install NSIS
         shell: powershell
@@ -445,11 +462,18 @@ jobs:
           AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
           AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
         run: |
-          trusted-signing-cli `
-            -e $env:AZURE_SIGNING_ENDPOINT `
-            -a $env:AZURE_SIGNING_ACCOUNT `
-            -c $env:AZURE_SIGNING_PROFILE `
+          $meta = Join-Path $env:RUNNER_TEMP "ts-metadata.json"
+          @{
+            Endpoint               = $env:AZURE_SIGNING_ENDPOINT
+            CodeSigningAccountName = $env:AZURE_SIGNING_ACCOUNT
+            CertificateProfileName = $env:AZURE_SIGNING_PROFILE
+          } | ConvertTo-Json | Set-Content -Path $meta -Encoding utf8
+
+          & "$env:SIGNTOOL_PATH" sign /v /fd SHA256 `
+            /tr http://timestamp.acs.microsoft.com/ /td SHA256 `
+            /dlib "$env:TS_DLIB_PATH" /dmdf "$meta" `
             "$env:INSTALLER_PATH"
+          if ($LASTEXITCODE -ne 0) { Write-Error "signtool failed to sign the installer"; exit 1 }
 
       - name: Compute SHA-256
         shell: powershell
@@ -747,9 +771,13 @@ jobs:
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
+          # No --entitlements: App-Sandbox entitlements are inert for a plugin
+          # loaded into a (non-sandboxed) DAW, and the hardened runtime does not
+          # restrict network or file access.  --timestamp is required for
+          # notarization.
           codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" \
             --options runtime \
-            --entitlements mofoMojoVst/entitlements.plist \
+            --timestamp \
             "$VST3_PATH"
           codesign --verify --deep --strict "$VST3_PATH"
           echo "VST3 signed OK"
@@ -760,7 +788,7 @@ jobs:
         run: |
           codesign --force --deep --sign "$APPLE_SIGNING_IDENTITY" \
             --options runtime \
-            --entitlements mofoMojoVst/entitlements.plist \
+            --timestamp \
             "$AU_PATH"
           codesign --verify --deep --strict "$AU_PATH"
           echo "AU signed OK"
