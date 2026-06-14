@@ -286,7 +286,7 @@ jobs:
       - name: Build VST3 (Windows)
         shell: powershell
         run: |
-          cmake --build build-windows --target ViatorJuceCMake_VST3
+          cmake --build build-windows --target HyperformanceSolutionsCMake_VST3
           $vst3 = Get-ChildItem -Recurse build-windows -Directory -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $vst3) {
             $vst3 = Get-ChildItem -Recurse build-windows -Filter "*.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -577,7 +577,7 @@ jobs:
       - name: Build VST3 + AU - arm64
         run: |
           cmake --build build-arm64 \
-            --target ViatorJuceCMake_VST3 ViatorJuceCMake_AU
+            --target HyperformanceSolutionsCMake_VST3 HyperformanceSolutionsCMake_AU
 
       # -- Build x86_64 slice ---------------------------------------------------
       - name: Configure CMake - x86_64
@@ -592,7 +592,7 @@ jobs:
       - name: Build VST3 + AU - x86_64
         run: |
           cmake --build build-x86_64 \
-            --target ViatorJuceCMake_VST3 ViatorJuceCMake_AU
+            --target HyperformanceSolutionsCMake_VST3 HyperformanceSolutionsCMake_AU
 
       # -- Lipo-combine into universal bundles ----------------------------------
       - name: Lipo-combine slices into universal bundles
