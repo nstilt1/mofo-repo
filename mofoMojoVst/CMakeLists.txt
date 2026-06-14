@@ -24,10 +24,20 @@ add_subdirectory(modules/JUCE-7.0.7)
 set(CMAKE_CXX_STANDARD 17)
 
 # ── macOS settings ────────────────────────────────────────────────────────────
+# These are DEFAULTS only — do NOT use FORCE.  The CI splits the universal build
+# into per-arch configures that pass -DCMAKE_OSX_ARCHITECTURES / -DCMAKE_OSX_-
+# DEPLOYMENT_TARGET on the command line; FORCE would override those, making the
+# "arm64" build compile universal (x86_64+arm64) while linking only the arm64
+# Rust .a — producing undefined x86_64 symbols at link time.  Guarding on
+# `NOT DEFINED` lets a command-line -D win and only falls back to a universal
+# build when no arch is specified (e.g. a local dev build).
 if(APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment version" FORCE)
-    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Architectures" FORCE)
-    set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET[arch=arm64] "11.0" CACHE STRING "arm64 minimum deployment target" FORCE)
+    if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment version")
+    endif()
+    if(NOT DEFINED CMAKE_OSX_ARCHITECTURES)
+        set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Architectures")
+    endif()
 endif()
 
 # ── Linux only: GTK / WebKit ──────────────────────────────────────────────────

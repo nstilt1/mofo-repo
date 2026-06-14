@@ -271,6 +271,26 @@ jobs:
         with:
           arch: x64
 
+      # trusted-signing-cli locates signtool.exe by guessing a Windows SDK
+      # version, and it guessed 10.0.26100.0 which isn't installed on this
+      # runner (only 10.0.22621.0 is).  Point it at the newest signtool.exe
+      # that actually exists via the SIGNTOOL_PATH env var it documents.
+      - name: Locate signtool for trusted-signing-cli
+        shell: powershell
+        run: |
+          $kitsBin = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $signtool = Get-ChildItem $kitsBin -Directory -ErrorAction SilentlyContinue |
+            Where-Object { Test-Path (Join-Path $_.FullName "x64\signtool.exe") } |
+            Sort-Object { try { [version]$_.Name } catch { [version]"0.0" } } -Descending |
+            Select-Object -First 1
+          if (-not $signtool) {
+            Write-Error "signtool.exe not found under $kitsBin\*\x64\"
+            exit 1
+          }
+          $signtoolPath = Join-Path $signtool.FullName "x64\signtool.exe"
+          Write-Host "Using signtool: $signtoolPath"
+          "SIGNTOOL_PATH=$signtoolPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Install CMake + Ninja
         uses: lukka/get-cmake@latest
 
