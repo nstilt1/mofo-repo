@@ -101,9 +101,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Clone software-licensor-client-side-library
-        shell: bash
+        shell: pwsh
         run: |
-          git clone https://github.com/nstilt1/software-licensor-client-side-library \
+          git clone https://github.com/nstilt1/software-licensor-client-side-library `
             software-licensor-client-side-library
 
       - name: Install Rust stable (Windows MSVC)
@@ -117,7 +117,7 @@ jobs:
           path: |
             ~\.cargo\registry
             ~\.cargo\git
-            software-licensor-client-side-library\target
+            software-licensor-client-side-library\software_licensor_static_rust_lib\target
           key: rust-windows-${{ hashFiles('software-licensor-client-side-library/software_licensor_static_rust_lib/Cargo.lock') }}
           restore-keys: rust-windows-
 
@@ -127,13 +127,15 @@ jobs:
         run: |
           cargo build --release --features logging --target x86_64-pc-windows-msvc
           Write-Host "Windows Rust library built:"
-          Get-Item ..\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+          # target/ is inside software_licensor_static_rust_lib (the working-directory),
+          # NOT one level up — matches the same fix applied for macOS artifacts.
+          Get-Item target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
 
       - name: Upload Rust Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: rust-lib-windows
-          path: software-licensor-client-side-library\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
+          path: software-licensor-client-side-library\software_licensor_static_rust_lib\target\x86_64-pc-windows-msvc\release\softwarelicensor.lib
           retention-days: 7
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -151,17 +153,17 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Extract version from .jucer file
-        shell: bash
+        shell: pwsh
         run: |
-          VERSION=$(python3 -c "
-          import re, sys
-          with open('mofoMojoVst/Mofo Filter.jucer', encoding='utf-8') as f:
-              m = re.search(r'version=\"([^\"]+)\"', f.read())
-              if not m: sys.exit('Version not found')
-              print(m.group(1))
-          ")
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "Detected version: $VERSION"
+          $content = Get-Content "mofoMojoVst/Mofo Filter.jucer" -Raw
+          if ($content -match 'version="([^"]+)"') {
+            $version = $matches[1]
+          } else {
+            Write-Error "Version not found"
+            exit 1
+          }
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+          Write-Host "Detected version: $version"
 
       - name: Download Rust Windows library
         uses: actions/download-artifact@v4
@@ -295,14 +297,14 @@ jobs:
           retention-days: 7
 
       - name: Save build metadata
-        shell: bash
+        shell: pwsh
         run: |
-          cat > windows-meta.env << EOF
-          INSTALLER_NAME=$INSTALLER_NAME
-          FILE_SHA256=$FILE_SHA256
-          VERSION=$VERSION
-          SLUG=$SLUG
-          EOF
+          @"
+          INSTALLER_NAME=$env:INSTALLER_NAME
+          FILE_SHA256=$env:FILE_SHA256
+          VERSION=$env:VERSION
+          SLUG=$env:SLUG
+          "@ | Out-File -FilePath windows-meta.env -Encoding utf8
 
       - name: Upload build metadata
         uses: actions/upload-artifact@v4
