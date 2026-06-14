@@ -8,7 +8,7 @@ on:
       - 'v*.*.*'
     paths:
       - 'mofoMojoVst/**'
-      - '.github/workflows/mofo-mojo-release.yml'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
     inputs:
       confirm:
