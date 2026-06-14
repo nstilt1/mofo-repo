@@ -198,41 +198,100 @@ target_link_libraries("${PROJECT_NAME}"
         # generates hundreds of D9025 'overriding /w with /W4' warnings.
 )
 
-# ── Compile-only optimisation flags (no link-time codegen) ────────────────────
-# We intentionally avoid /O2 on MSVC for JUCE plugin-client TUs.
-# juce_audio_plugin_client_VST3.cpp pulls in the entire VST3 SDK + JUCE
-# wrapper; MSVC's /O2 optimizer spends 60–90 min on that single TU on CI.
-# /O1 (optimize for size) compiles in under 5 min with negligible size cost
-# for SDK glue code.  User source files in Source/ still get /O2.
+# ── Optimisation & Link-Time Optimisation (LTO) ───────────────────────────────
+# LTO is ON by default (ENABLE_LTO).  It is applied to the shared-code plugin
+# target AND each per-format target (VST3/AU), because the final link — where
+# LTO codegen actually happens — occurs in the format targets, not the static
+# SharedCode library.
+#
+#   * Clang / AppleClang (macOS): ThinLTO (-flto=thin) — parallel and fast.
+#   * GCC (Linux):                parallel full LTO (-flto=auto).
+#   * MSVC (Windows):             /GL + /LTCG via CMake's IPO support, which
+#                                 also emits /LTCG when archiving the static
+#                                 lib (otherwise you get LNK4075 warnings).
+#
+# ⚠ WINDOWS HANG WARNING: on this codebase, MSVC whole-program optimisation has
+# historically caused multi-hour LINK hangs — /LTCG defers the VST3-SDK
+# translation unit's codegen (the same TU that made /O2 hang at compile time) to
+# link time.  A beefier runner may or may not get through it.  If the Windows
+# build hangs, configure THAT job with -DENABLE_LTO=OFF to fall back to the
+# proven /O1-glue + /O2-user-code config, and consider adding `timeout-minutes`
+# to the Windows job so a hang can't run for hours.
+option(ENABLE_LTO "Enable link-time optimisation (ThinLTO on Clang, /GL+/LTCG on MSVC)" ON)
+
+# Targets that need the flags: shared-code target + each per-format target.
+set(_opt_targets "${PROJECT_NAME}")
+foreach(_fmt ${FORMATS})
+    if(TARGET "${PROJECT_NAME}_${_fmt}")
+        list(APPEND _opt_targets "${PROJECT_NAME}_${_fmt}")
+    endif()
+endforeach()
+
 if(MSVC)
-    # All plugin targets: /O1 safe default (avoids optimizer hang on SDK TUs)
-    target_compile_options("${PROJECT_NAME}" PRIVATE
-        $<$<CONFIG:Release>:/O1 /Oi /Gy>
-        $<$<CONFIG:Debug>:/Od /Zi>
-    )
-    # Disable incremental linking — it conflicts with the Rust .a
-    target_link_options("${PROJECT_NAME}" PRIVATE
-        $<$<CONFIG:Release>:/INCREMENTAL:NO>
-    )
-    # SharedCode (user sources only): upgrade to /O2 — these are small and fast
-    target_compile_options(SharedCode INTERFACE
-        $<$<CONFIG:Release>:/O2>
-    )
-else()
-    # Self-hosted runners have ample compute and clang/gcc have no MSVC-style
-    # single-TU optimizer pathology, so use -O3 for maximum Release perf.
-    target_compile_options("${PROJECT_NAME}" PRIVATE
-        $<$<CONFIG:Release>:-O3>
-        $<$<CONFIG:Debug>:-O0 -g>
-    )
-    if(APPLE)
+    if(ENABLE_LTO)
+        # /GL on compiles, /LTCG on link/archive is handled by CMake's IPO.
+        foreach(_t ${_opt_targets})
+            target_compile_options(${_t} PRIVATE
+                $<$<CONFIG:Release>:/O2 /Oi /Gy>
+                $<$<CONFIG:Debug>:/Od /Zi>
+            )
+            target_link_options(${_t} PRIVATE
+                $<$<CONFIG:Release>:/INCREMENTAL:NO /OPT:REF /OPT:ICF>
+            )
+        endforeach()
+        include(CheckIPOSupported)
+        check_ipo_supported(RESULT _ipo_ok OUTPUT _ipo_msg LANGUAGES CXX)
+        if(_ipo_ok)
+            foreach(_t ${_opt_targets})
+                set_property(TARGET ${_t} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+            endforeach()
+            message(STATUS "MSVC LTO (/GL + /LTCG) ENABLED — watch link time on the VST3 target.")
+        else()
+            message(WARNING "IPO/LTO requested but not supported: ${_ipo_msg}")
+        endif()
+        target_compile_options(SharedCode INTERFACE $<$<CONFIG:Release>:/O2>)
+    else()
+        # Proven non-LTO config: /O1 on glue avoids the VST3-TU optimiser hang;
+        # user DSP sources (SharedCode) still get /O2.
         target_compile_options("${PROJECT_NAME}" PRIVATE
-            -fvisibility=hidden
-            -fvisibility-inlines-hidden
+            $<$<CONFIG:Release>:/O1 /Oi /Gy>
+            $<$<CONFIG:Debug>:/Od /Zi>
         )
         target_link_options("${PROJECT_NAME}" PRIVATE
-            $<$<CONFIG:Release>:-Wl,-dead_strip>
+            $<$<CONFIG:Release>:/INCREMENTAL:NO>
         )
+        target_compile_options(SharedCode INTERFACE $<$<CONFIG:Release>:/O2>)
+    endif()
+else()
+    # ThinLTO on Clang/AppleClang; parallel full LTO on GCC.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(_lto_flag -flto=thin)
+    else()
+        set(_lto_flag -flto=auto)
+    endif()
+    foreach(_t ${_opt_targets})
+        target_compile_options(${_t} PRIVATE
+            $<$<CONFIG:Release>:-O3>
+            $<$<CONFIG:Debug>:-O0 -g>
+        )
+        if(ENABLE_LTO)
+            # Compile bitcode on every TU; trigger LTO codegen at link (-O3 sets
+            # the codegen optimisation level for the LTO step).
+            target_compile_options(${_t} PRIVATE $<$<CONFIG:Release>:${_lto_flag}>)
+            target_link_options(${_t}    PRIVATE $<$<CONFIG:Release>:${_lto_flag} -O3>)
+        endif()
+        if(APPLE)
+            target_compile_options(${_t} PRIVATE
+                -fvisibility=hidden
+                -fvisibility-inlines-hidden
+            )
+            target_link_options(${_t} PRIVATE
+                $<$<CONFIG:Release>:-Wl,-dead_strip>
+            )
+        endif()
+    endforeach()
+    if(ENABLE_LTO)
+        message(STATUS "LTO ENABLED (${_lto_flag}).")
     endif()
 endif()
 

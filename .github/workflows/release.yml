@@ -599,7 +599,11 @@ jobs:
           path: .
 
       - name: Load build metadata
-        run: sed 's/^ *//' windows-meta.env >> "$GITHUB_ENV"
+        # windows-meta.env is written by PowerShell with CRLF line endings;
+        # strip the trailing \r (and any leading indentation) before feeding
+        # GITHUB_ENV, otherwise SLUG/VERSION carry a \r into the S3 key and the
+        # release API can't match the slug.
+        run: tr -d '\r' < windows-meta.env | sed 's/^ *//' >> "$GITHUB_ENV"
 
       - name: Resolve installer path
         run: |
