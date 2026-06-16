@@ -9,7 +9,7 @@
               pluginManufacturer="Altered Brain Chemistry" pluginCode="Mojo"
               pluginManufacturerCode="Abch" pluginAUMainType="'aufx'" pluginAUIsSandboxSafe="1"
               pluginVST3Category="Filter,Fx" cppLanguageStandard="17" companyEmail="somedooby@alteredbrainchemistry.com"
-              pluginCharacteristicsValue="pluginEditorRequiresKeys" version="1.0.12">
+              pluginCharacteristicsValue="pluginEditorRequiresKeys" version="1.0.13">
   <MAINGROUP id="Kqft8I" name="The Mofo's Mojo v1">
     <GROUP id="{B5CA9F11-01E9-B0A3-1827-CD83DD008D6F}" name="modules">
       <GROUP id="{BE9047F0-6BC7-4AB0-4417-98D4C11E4100}" name="licensing">
