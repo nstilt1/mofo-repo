@@ -491,6 +491,7 @@ jobs:
             '!define PRODUCT_NAME "The Mofo''s Mojo v1"',
             "!define PRODUCT_VERSION `"$version`"",
             '!define INSTALL_PARENT "$PROGRAMFILES64\Common Files\VST3\Altered Brain Chemistry"',
+            '!define VST3_DIR "${INSTALL_PARENT}\The Mofo''s Mojo v1.vst3"',
             '',
             'Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"',
             "OutFile `"MofoMojo-$version-windows-installer.exe`"",
@@ -499,8 +500,8 @@ jobs:
             'Unicode True',
             '',
             'Section "VST3 Plugin"',
-            '  SetOutPath "${INSTALL_PARENT}"',
-            "  File /r `"$vst3Path`"",
+            '  SetOutPath "${VST3_DIR}"',
+            "  File /r `"$vst3Path\*.*`"",
             'SectionEnd'
           )
           $lines | Out-File -FilePath installer.nsi -Encoding UTF8
