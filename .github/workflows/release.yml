@@ -490,17 +490,17 @@ jobs:
           $nsiContent = @"
           !define PRODUCT_NAME "The Mofo's Mojo v1"
           !define PRODUCT_VERSION "$version"
-          !define VST3_INSTALL_DIR "`$PROGRAMFILES64\Common Files\VST3\Altered Brain Chemistry\The Mofo's Mojo v1.vst3"
+          !define INSTALL_PARENT "$PROGRAMFILES64\Common Files\VST3\Altered Brain Chemistry"
 
-          Name "`${PRODUCT_NAME} `${PRODUCT_VERSION}"
+          Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
           OutFile "MofoMojo-$version-windows-installer.exe"
-          InstallDir "`${VST3_INSTALL_DIR}"
+          InstallDir "${INSTALL_PARENT}"
           RequestExecutionLevel admin
           Unicode True
 
           Section "VST3 Plugin"
-            SetOutPath "`${VST3_INSTALL_DIR}"
-            File /r "$vst3Path\*.*"
+            SetOutPath "${INSTALL_PARENT}"
+            File /r "$vst3Path"
           SectionEnd
           "@
           $nsiContent | Out-File -FilePath installer.nsi -Encoding UTF8
