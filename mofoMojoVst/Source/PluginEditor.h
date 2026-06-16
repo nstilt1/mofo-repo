@@ -150,7 +150,6 @@ public:
         messageLabel.setColour(juce::Label::textColourId, juce::Colours::black);
         messageLabel.setColour(juce::Label::backgroundColourId, juce::Colours::white);
         messageLabel.setColour(juce::Label::outlineColourId, juce::Colours::black);
-        messageLabel.setText("A new version is available", juce::NotificationType::dontSendNotification);
     }
 
     /**
@@ -191,7 +190,13 @@ public:
 
         if (cloudVersion.isEmpty()) return false;
 
-        return compareVersions(cloudVersion, clientVersion) > 0;
+        if (compareVersions(cloudVersion, clientVersion) > 0)
+        {
+            messageLabel.setText("An update is available. Installed: " + clientVersion + " -> " + cloudVersion,
+                                 juce::NotificationType::dontSendNotification);
+            return true;
+        }
+        return false;
     }
 
     void paint(juce::Graphics& g) override
