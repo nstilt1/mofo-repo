@@ -487,23 +487,23 @@ jobs:
         run: |
           $version = $env:VERSION
           $vst3Path = $env:VST3_PATH
-          $nsiContent = @"
-          !define PRODUCT_NAME "The Mofo's Mojo v1"
-          !define PRODUCT_VERSION "$version"
-          !define INSTALL_PARENT "$PROGRAMFILES64\Common Files\VST3\Altered Brain Chemistry"
-
-          Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-          OutFile "MofoMojo-$version-windows-installer.exe"
-          InstallDir "${INSTALL_PARENT}"
-          RequestExecutionLevel admin
-          Unicode True
-
-          Section "VST3 Plugin"
-            SetOutPath "${INSTALL_PARENT}"
-            File /r "$vst3Path"
-          SectionEnd
-          "@
-          $nsiContent | Out-File -FilePath installer.nsi -Encoding UTF8
+          $lines = @(
+            '!define PRODUCT_NAME "The Mofo''s Mojo v1"',
+            "!define PRODUCT_VERSION `"$version`"",
+            '!define INSTALL_PARENT "$PROGRAMFILES64\Common Files\VST3\Altered Brain Chemistry"',
+            '',
+            'Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"',
+            "OutFile `"MofoMojo-$version-windows-installer.exe`"",
+            'InstallDir "${INSTALL_PARENT}"',
+            'RequestExecutionLevel admin',
+            'Unicode True',
+            '',
+            'Section "VST3 Plugin"',
+            '  SetOutPath "${INSTALL_PARENT}"',
+            "  File /r `"$vst3Path`"",
+            'SectionEnd'
+          )
+          $lines | Out-File -FilePath installer.nsi -Encoding UTF8
 
       - name: Build NSIS installer
         shell: powershell
