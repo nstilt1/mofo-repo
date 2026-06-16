@@ -168,12 +168,6 @@ public:
     {
         juce::String cloudVersion;
 
-        // Phase 1 – prefer the version the licensor already gave us.
-        if (status.isUnlocked())
-        {
-            cloudVersion = status.getCloudVersion();
-        }
-
         // Phase 2 – if we don't have a cloud version yet, do a direct check
         // (rate-limited to once per 3 days).
         if (cloudVersion.isEmpty() && VersionCheck::isDue())

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.23.1)
 
 # ── Extract version from the .jucer file ──────────────────────────────────────
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/Mofo Filter.jucer" JUCER_CONTENT)
-string(REGEX MATCH "version=\"([0-9]+\\.[0-9]+(\\.[0-9]+)?)\"" _version_match "${JUCER_CONTENT}")
+string(REGEX MATCH "version=\"([0-9]+\\.[0-9]+\\.[0-9]+)\"" _version_match "${JUCER_CONTENT}")
 if(NOT CMAKE_MATCH_1)
     message(FATAL_ERROR "Could not extract version from 'Mofo Filter.jucer'.")
 endif()
