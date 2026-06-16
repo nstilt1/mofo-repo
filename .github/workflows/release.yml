@@ -485,25 +485,24 @@ jobs:
       - name: Create NSIS installer script
         shell: powershell
         run: |
-          $version = $env:VERSION
-          $vst3Path = $env:VST3_PATH
-          $lines = @(
-            '!define PRODUCT_NAME "The Mofo''s Mojo v1"',
-            "!define PRODUCT_VERSION `"$version`"",
-            '!define INSTALL_PARENT "$PROGRAMFILES64\Common Files\VST3\Altered Brain Chemistry"',
-            '!define VST3_DIR "${INSTALL_PARENT}\The Mofo''s Mojo v1.vst3"',
-            '',
-            'Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"',
-            "OutFile `"MofoMojo-$version-windows-installer.exe`"",
-            'InstallDir "${INSTALL_PARENT}"',
-            'RequestExecutionLevel admin',
-            'Unicode True',
-            '',
-            'Section "VST3 Plugin"',
-            '  SetOutPath "${VST3_DIR}"',
-            "  File /r `"$vst3Path\*.*`"",
-            'SectionEnd'
-          )
+          $version    = $env:VERSION
+          $vst3Path   = $env:VST3_PATH
+          $installParent = '$PROGRAMFILES64\Common Files\VST3\Altered Brain Chemistry'
+          $dll = Get-ChildItem -Path "$vst3Path\Contents\x86_64-win" -Filter "*.vst3" | Select-Object -First 1
+          if (-not $dll) { Write-Error "Could not find .vst3 DLL in x86_64-win"; exit 1 }
+          $lines = [System.Collections.Generic.List[string]]::new()
+          $lines.Add("!define INSTALL_PARENT `"$installParent`"")
+          $lines.Add('')
+          $lines.Add("Name `"The Mofo's Mojo v1 $version`"")
+          $lines.Add("OutFile `"MofoMojo-$version-windows-installer.exe`"")
+          $lines.Add('InstallDir "${INSTALL_PARENT}"')
+          $lines.Add('RequestExecutionLevel admin')
+          $lines.Add('Unicode True')
+          $lines.Add('')
+          $lines.Add('Section "VST3 Plugin"')
+          $lines.Add('  SetOutPath "${INSTALL_PARENT}"')
+          $lines.Add("  File `"$($dll.FullName)`"")
+          $lines.Add('SectionEnd')
           $lines | Out-File -FilePath installer.nsi -Encoding UTF8
 
       - name: Build NSIS installer
