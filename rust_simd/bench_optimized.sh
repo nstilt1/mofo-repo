@@ -1,0 +1,1 @@
+RUSTFLAGS="-C target-feature=AVX,SSE,SSE41 -C target-cpu=native" cargo bench
